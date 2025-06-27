@@ -1,10 +1,71 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { protect } = require('../middleware/auth');
+const { protect, admin } = require('../middleware/auth');
 const User = require('../models/User');
 const TrustLog = require('../models/TrustLog');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const router = express.Router();
+
+// @route   GET /api/users
+// @desc    Get all users (with filtering and pagination)
+// @access  Private
+router.get('/', protect, async (req, res) => {
+  try {
+    const { search, role, university, skills, page = 1, limit = 20 } = req.query;
+    
+    // Build filter object
+    const filter = {};
+    
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { university: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    if (role) {
+      filter.role = role;
+    }
+    
+    if (university) {
+      filter.university = { $regex: university, $options: 'i' };
+    }
+    
+    if (skills) {
+      filter.skills = { $in: skills.split(',').map(skill => new RegExp(skill.trim(), 'i')) };
+    }
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+    
+    // Get users with pagination
+    const users = await User.find(filter)
+      .select('-password')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    // Get total count for pagination
+    const total = await User.countDocuments(filter);
+    
+    res.json({
+      users,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / limit),
+        totalUsers: total,
+        hasNextPage: skip + users.length < total,
+        hasPrevPage: page > 1
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 // @route   GET /api/users/profile
 // @desc    Get current user profile
@@ -183,6 +244,161 @@ router.get('/trust-stats', protect, async (req, res) => {
       success: false, 
       message: 'Server error' 
     });
+  }
+});
+
+// Register new user
+router.post('/register', async (req, res) => {
+  try {
+    const { name, email, password, university, bio, skills, github, linkedin } = req.body;
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create user
+    const user = new User({
+      name,
+      email,
+      password: hashedPassword,
+      university,
+      bio,
+      skills: skills || [],
+      github,
+      linkedin,
+      trustScore: 50, // Starting trust score
+      role: 'student'
+    });
+
+    await user.save();
+
+    // Create JWT token
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // Log trust score change
+    await TrustLog.create({
+      user: user._id,
+      action: 'account_created',
+      points: 50,
+      description: 'Account created - initial trust score'
+    });
+
+    res.status(201).json({
+      message: 'User registered successfully',
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        university: user.university,
+        trustScore: user.trustScore,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Login user
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Check if user exists
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    // Check password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    // Create JWT token
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      message: 'Login successful',
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        university: user.university,
+        trustScore: user.trustScore,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get user's trust log
+router.get('/trust-log', protect, async (req, res) => {
+  try {
+    const logs = await TrustLog.find({ user: req.user._id })
+      .sort({ createdAt: -1 })
+      .limit(20);
+    
+    res.json({ logs });
+  } catch (error) {
+    console.error('Error fetching trust log:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Admin: Get all users (admin only)
+router.get('/admin/all', protect, admin, async (req, res) => {
+  try {
+    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    res.json({ users });
+  } catch (error) {
+    console.error('Error fetching all users:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Admin: Update user role
+router.put('/admin/:userId/role', protect, admin, async (req, res) => {
+  try {
+    const { role } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.params.userId,
+      { role },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      message: 'User role updated successfully',
+      user
+    });
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

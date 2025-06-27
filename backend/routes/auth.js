@@ -56,16 +56,17 @@ router.post('/register', [
       bio: bio || '',
       skills: skills || [],
       github: github || '',
-      linkedin: linkedin || ''
+      linkedin: linkedin || '',
+      role: 'student'
     });
 
     // Log trust activity for account creation
-    await TrustLog.logActivity(
-      user._id,
-      'account_verified',
-      5,
-      'Account created successfully'
-    );
+    await TrustLog.create({
+      user: user._id,
+      action: 'account_verified',
+      points: 5,
+      description: 'Account created successfully'
+    });
 
     // Generate token
     const token = generateToken(user._id);

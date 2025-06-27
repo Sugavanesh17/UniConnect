@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const { protect, canViewProject, canEditProject, projectOwner, hasSignedNDA } = require('../middleware/auth');
 const Project = require('../models/Project');
 const TrustLog = require('../models/TrustLog');
+const User = require('../models/User');
 
 const router = express.Router();
 
@@ -12,74 +13,116 @@ const router = express.Router();
 router.get('/', protect, async (req, res) => {
   try {
     const { 
+      search, 
       privacy, 
       status, 
       techStack, 
       university, 
       page = 1, 
-      limit = 10,
+      limit = 20,
       sort = 'createdAt',
       order = 'desc'
     } = req.query;
 
-    const query = { isDeleted: false };
-    
-    // Filter by privacy (users can only see public projects + their own)
-    if (privacy === 'public') {
-      query.privacy = 'public';
-    } else if (privacy === 'private') {
-      query.$or = [
-        { privacy: 'private', 'members.user': req.user._id },
-        { privacy: 'private', owner: req.user._id }
-      ];
-    } else if (privacy === 'draft') {
-      query.owner = req.user._id;
+    // Build filter object
+    const filter = {};
+
+    // Privacy filter
+    if (privacy && privacy !== 'all') {
+      if (privacy === 'public') {
+        filter.privacy = 'public';
+      } else if (privacy === 'private') {
+        // Only show private projects if user is owner or member
+        filter.$or = [
+          { privacy: 'private', owner: req.user._id },
+          { privacy: 'private', 'members.user': req.user._id }
+        ];
+      } else if (privacy === 'protected') {
+        filter.privacy = 'protected';
+      }
     } else {
-      // Default: show public + user's projects
-      query.$or = [
+      // Show public, protected, and user's private projects
+      filter.$or = [
         { privacy: 'public' },
-        { owner: req.user._id },
-        { 'members.user': req.user._id }
+        { privacy: 'protected' },
+        { privacy: 'private', owner: req.user._id },
+        { privacy: 'private', 'members.user': req.user._id }
       ];
     }
 
-    if (status) query.status = status;
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+
     if (techStack) {
       const techArray = techStack.split(',').map(tech => tech.trim());
-      query.techStack = { $in: techArray };
-    }
-    if (university) {
-      query.university = { $regex: university, $options: 'i' };
+      filter.techStack = { $in: techArray };
     }
 
+    if (university) {
+      filter.university = { $regex: university, $options: 'i' };
+    }
+
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build sort object
     const sortOptions = {};
     sortOptions[sort] = order === 'desc' ? -1 : 1;
 
-    const projects = await Project.find(query)
+    // Get projects with pagination
+    const projects = await Project.find(filter)
       .populate('owner', 'name university trustScore')
       .populate('members.user', 'name university trustScore')
       .sort(sortOptions)
-      .limit(parseInt(limit))
-      .skip((parseInt(page) - 1) * parseInt(limit));
+      .skip(skip)
+      .limit(parseInt(limit));
 
-    const total = await Project.countDocuments(query);
+    // Get total count for pagination
+    const total = await Project.countDocuments(filter);
 
     res.json({
-      success: true,
       projects,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / parseInt(limit))
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalProjects: total,
+        hasNextPage: skip + projects.length < total,
+        hasPrevPage: parseInt(page) > 1
       }
     });
   } catch (error) {
-    console.error('Get projects error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
+    console.error('Error fetching projects:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   GET /api/projects/my-projects
+// @desc    Get user's projects (owned and member of)
+// @access  Private
+router.get('/my-projects', protect, async (req, res) => {
+  try {
+    const projects = await Project.find({
+      $or: [
+        { owner: req.user._id },
+        { 'members.user': req.user._id }
+      ]
+    })
+    .populate('owner', 'name university trustScore')
+    .populate('members.user', 'name university trustScore')
+    .sort({ createdAt: -1 });
+
+    res.json({ projects });
+  } catch (error) {
+    console.error('Error fetching user projects:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -375,6 +418,170 @@ router.put('/:projectId/join-request/:requestId', [
   }
 });
 
+// @route   POST /api/projects/:projectId/tasks
+// @desc    Create a new task in project
+// @access  Private (Owner/Contributor)
+router.post('/:projectId/tasks', [
+  protect,
+  canEditProject,
+  body('title').trim().isLength({ min: 1, max: 200 }).withMessage('Title is required'),
+  body('description').optional().isLength({ max: 1000 }).withMessage('Description cannot exceed 1000 characters'),
+  body('assignedTo').optional().isMongoId().withMessage('Invalid user ID'),
+  body('dueDate').optional().isISO8601().toDate().withMessage('Invalid date format'),
+  body('status').optional().isIn(['todo', 'in-progress', 'completed']).withMessage('Invalid status')
+], async (req, res) => {
+  try {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        success: false, 
+        errors: errors.array() 
+      });
+    }
+
+    const { title, description, assignedTo, dueDate, status = 'todo' } = req.body;
+    const project = req.project;
+
+    const newTask = {
+      title,
+      description: description || '',
+      assignedTo: assignedTo || null,
+      dueDate: dueDate || null,
+      status,
+      createdBy: req.user._id,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    project.tasks.push(newTask);
+    await project.save();
+
+    // Populate the assignedTo field if it exists
+    if (assignedTo) {
+      const lastTask = project.tasks[project.tasks.length - 1];
+      await project.populate('tasks.assignedTo', 'name email');
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Task created successfully',
+      task: project.tasks[project.tasks.length - 1]
+    });
+  } catch (error) {
+    console.error('Create task error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error' 
+    });
+  }
+});
+
+// @route   PUT /api/projects/:projectId/tasks/:taskId
+// @desc    Update a task in project
+// @access  Private (Owner/Contributor)
+router.put('/:projectId/tasks/:taskId', [
+  protect,
+  canEditProject,
+  body('title').optional().trim().isLength({ min: 1, max: 200 }).withMessage('Title must be between 1 and 200 characters'),
+  body('description').optional().isLength({ max: 1000 }).withMessage('Description cannot exceed 1000 characters'),
+  body('assignedTo').optional().isMongoId().withMessage('Invalid user ID'),
+  body('dueDate').optional().isISO8601().toDate().withMessage('Invalid date format'),
+  body('status').optional().isIn(['todo', 'in-progress', 'completed']).withMessage('Invalid status')
+], async (req, res) => {
+  try {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        success: false, 
+        errors: errors.array() 
+      });
+    }
+
+    const { title, description, assignedTo, dueDate, status } = req.body;
+    const project = req.project;
+    const taskId = req.params.taskId;
+
+    const task = project.tasks.id(taskId);
+    if (!task) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Task not found' 
+      });
+    }
+
+    // Update task fields
+    if (title !== undefined) task.title = title;
+    if (description !== undefined) task.description = description;
+    if (assignedTo !== undefined) task.assignedTo = assignedTo;
+    if (dueDate !== undefined) task.dueDate = dueDate;
+    if (status !== undefined) task.status = status;
+    
+    task.updatedAt = new Date();
+
+    await project.save();
+
+    // Populate the assignedTo field if it exists
+    if (task.assignedTo) {
+      await project.populate('tasks.assignedTo', 'name email');
+    }
+
+    res.json({
+      success: true,
+      message: 'Task updated successfully',
+      task: task
+    });
+  } catch (error) {
+    console.error('Update task error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error' 
+    });
+  }
+});
+
+// @route   DELETE /api/projects/:projectId/tasks/:taskId
+// @desc    Delete a task from project
+// @access  Private (Owner/Contributor)
+router.delete('/:projectId/tasks/:taskId', protect, canEditProject, async (req, res) => {
+  try {
+    const project = req.project;
+    const taskId = req.params.taskId;
+
+    const task = project.tasks.id(taskId);
+    if (!task) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Task not found' 
+      });
+    }
+
+    // Check if user can delete the task (owner or task creator)
+    if (project.owner.toString() !== req.user._id.toString() && 
+        task.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not authorized to delete this task' 
+      });
+    }
+
+    task.remove();
+    await project.save();
+
+    res.json({
+      success: true,
+      message: 'Task deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete task error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error' 
+    });
+  }
+});
+
 // @route   POST /api/projects/:projectId/sign-nda
 // @desc    Sign NDA for private project
 // @access  Private
@@ -413,6 +620,68 @@ router.post('/:projectId/sign-nda', protect, canViewProject, async (req, res) =>
       success: false, 
       message: 'Server error' 
     });
+  }
+});
+
+// Dashboard route - get user stats and recent data
+router.get('/dashboard', protect, async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Get user's projects
+    const userProjects = await Project.find({
+      $or: [
+        { owner: userId },
+        { 'members.user': userId }
+      ]
+    }).populate('owner', 'name university trustScore');
+
+    // Get user's owned projects
+    const ownedProjects = await Project.find({ owner: userId });
+    
+    // Get user's joined projects
+    const joinedProjects = await Project.find({
+      'members.user': userId,
+      owner: { $ne: userId }
+    });
+
+    // Calculate stats
+    const stats = {
+      totalProjects: userProjects.length,
+      activeProjects: userProjects.filter(p => p.status === 'active').length,
+      totalCollaborators: userProjects.reduce((acc, project) => {
+        return acc + (project.members?.length || 0);
+      }, 0),
+      trustScore: req.user.trustScore || 50
+    };
+
+    // Get recent projects (last 5)
+    const recentProjects = userProjects
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 5);
+
+    // Get recent activities (mock data for now)
+    const recentActivities = [
+      {
+        description: 'You joined a new project',
+        timestamp: new Date(),
+        type: 'project_joined'
+      },
+      {
+        description: 'Your trust score increased',
+        timestamp: new Date(Date.now() - 86400000), // 1 day ago
+        type: 'trust_increased'
+      }
+    ];
+
+    res.json({
+      stats,
+      recentProjects,
+      recentActivities
+    });
+  } catch (error) {
+    console.error('Dashboard error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

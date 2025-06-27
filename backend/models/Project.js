@@ -71,6 +71,43 @@ const projectSchema = new mongoose.Schema({
       ref: 'User'
     }
   }],
+  tasks: [{
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 200
+    },
+    description: {
+      type: String,
+      maxlength: 1000
+    },
+    assignedTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    dueDate: {
+      type: Date
+    },
+    status: {
+      type: String,
+      enum: ['todo', 'in-progress', 'completed'],
+      default: 'todo'
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+    updatedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   tags: [{
     type: String,
     trim: true

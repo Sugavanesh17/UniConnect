@@ -57,8 +57,8 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['user', 'admin'],
-    default: 'user'
+    enum: ['student', 'admin'],
+    default: 'student'
   },
   isActive: {
     type: Boolean,
@@ -76,8 +76,9 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
+/* Removed duplicate index on email to fix mongoose warning */
 // Index for better query performance
-userSchema.index({ email: 1 });
+// userSchema.index({ email: 1 });
 userSchema.index({ university: 1 });
 userSchema.index({ skills: 1 });
 userSchema.index({ trustScore: -1 });
