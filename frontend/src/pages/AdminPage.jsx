@@ -12,11 +12,13 @@ import {
   Ban,
   CheckCircle,
   XCircle,
-  MoreHorizontal
+  MoreHorizontal,
+  Trash2
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const AdminPage = () => {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [stats, setStats] = useState({});
   const [users, setUsers] = useState([]);
@@ -36,17 +38,29 @@ const AdminPage = () => {
     else if (activeTab === 'reports') fetchReports();
   }, [activeTab]);
 
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+  };
+
   const fetchDashboardData = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/dashboard`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: getAuthHeaders()
       });
       if (response.ok) {
         const data = await response.json();
         setStats(data.stats || {});
+      } else {
+        console.error('Failed to fetch dashboard data:', response.status);
+        toast.error('Failed to load dashboard data');
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -55,42 +69,54 @@ const AdminPage = () => {
   const fetchUsers = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/users`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: getAuthHeaders()
       });
       if (response.ok) {
         const data = await response.json();
         setUsers(data.users || []);
+      } else {
+        console.error('Failed to fetch users:', response.status);
+        toast.error('Failed to load users');
       }
     } catch (error) {
       console.error('Error fetching users:', error);
+      toast.error('Failed to load users');
     }
   };
 
   const fetchProjects = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/projects`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: getAuthHeaders()
       });
       if (response.ok) {
         const data = await response.json();
         setProjects(data.projects || []);
+      } else {
+        console.error('Failed to fetch projects:', response.status);
+        toast.error('Failed to load projects');
       }
     } catch (error) {
       console.error('Error fetching projects:', error);
+      toast.error('Failed to load projects');
     }
   };
 
   const fetchReports = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/reports`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: getAuthHeaders()
       });
       if (response.ok) {
         const data = await response.json();
         setReports(data.reports || []);
+      } else {
+        console.error('Failed to fetch reports:', response.status);
+        toast.error('Failed to load reports');
       }
     } catch (error) {
       console.error('Error fetching reports:', error);
+      toast.error('Failed to load reports');
     }
   };
 
@@ -98,17 +124,19 @@ const AdminPage = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/status`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ isActive: status === 'active', reason })
       });
       if (response.ok) {
+        toast.success(`User ${status === 'active' ? 'activated' : 'deactivated'} successfully`);
         fetchUsers();
+      } else {
+        const data = await response.json();
+        toast.error(data.message || 'Failed to update user status');
       }
     } catch (error) {
       console.error('Error updating user status:', error);
+      toast.error('Failed to update user status');
     }
   };
 
@@ -116,17 +144,19 @@ const AdminPage = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/trust-score`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ points: trustScore, reason })
       });
       if (response.ok) {
+        toast.success('Trust score updated successfully');
         fetchUsers();
+      } else {
+        const data = await response.json();
+        toast.error(data.message || 'Failed to update trust score');
       }
     } catch (error) {
       console.error('Error updating trust score:', error);
+      toast.error('Failed to update trust score');
     }
   };
 
@@ -134,17 +164,43 @@ const AdminPage = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/admin/reports/${reportId}`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ status, adminNotes })
       });
       if (response.ok) {
+        toast.success('Report handled successfully');
         fetchReports();
+      } else {
+        const data = await response.json();
+        toast.error(data.message || 'Failed to handle report');
       }
     } catch (error) {
       console.error('Error handling report:', error);
+      toast.error('Failed to handle report');
+    }
+  };
+
+  const handleDeleteProject = async (projectId, projectTitle) => {
+    if (!window.confirm(`Are you sure you want to delete "${projectTitle}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/projects/${projectId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+
+      if (response.ok) {
+        toast.success('Project deleted successfully');
+        fetchProjects(); // Refresh the projects list
+      } else {
+        const data = await response.json();
+        toast.error(data.message || 'Failed to delete project');
+      }
+    } catch (error) {
+      console.error('Delete project error:', error);
+      toast.error('Failed to delete project');
     }
   };
 
@@ -389,6 +445,13 @@ const AdminPage = () => {
                     </button>
                     <button className="px-3 py-1 text-xs bg-red-100 text-red-800 rounded-lg hover:bg-red-200">
                       Flag
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteProject(project._id, project.title)}
+                      className="px-3 py-1 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center space-x-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Delete</span>
                     </button>
                   </div>
                 </div>

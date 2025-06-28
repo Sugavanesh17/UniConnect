@@ -61,12 +61,12 @@ router.post('/register', [
     });
 
     // Log trust activity for account creation
-    await TrustLog.create({
-      user: user._id,
-      action: 'account_verified',
-      points: 5,
-      description: 'Account created successfully'
-    });
+    await TrustLog.logActivity(
+      user._id,
+      'account_created',
+      TrustLog.getPointsForAction('account_created'),
+      'Account created successfully'
+    );
 
     // Generate token
     const token = generateToken(user._id);

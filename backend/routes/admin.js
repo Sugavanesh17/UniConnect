@@ -400,4 +400,30 @@ router.get('/trust-logs', async (req, res) => {
   }
 });
 
+// @route   GET /api/admin/reports
+// @desc    Get reports and flags (placeholder for future implementation)
+// @access  Private (Admin only)
+router.get('/reports', async (req, res) => {
+  try {
+    // For now, return empty reports array
+    // This can be expanded later when reporting system is implemented
+    res.json({
+      success: true,
+      reports: [],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 0,
+        pages: 0
+      }
+    });
+  } catch (error) {
+    console.error('Get reports error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error' 
+    });
+  }
+});
+
 module.exports = router; 

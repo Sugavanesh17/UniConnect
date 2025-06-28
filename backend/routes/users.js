@@ -5,6 +5,7 @@ const User = require('../models/User');
 const TrustLog = require('../models/TrustLog');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 
 const router = express.Router();
 
@@ -111,6 +112,10 @@ router.put('/profile', [
 
     const { name, bio, university, skills, github, linkedin } = req.body;
     
+    // Get current user data to check if profile was previously incomplete
+    const currentUser = await User.findById(req.user._id);
+    const wasProfileIncomplete = !currentUser.bio && !currentUser.skills?.length && !currentUser.github && !currentUser.linkedin;
+    
     const updateFields = {};
     if (name) updateFields.name = name;
     if (bio !== undefined) updateFields.bio = bio;
@@ -125,10 +130,38 @@ router.put('/profile', [
       { new: true, runValidators: true }
     );
 
+    // Log trust activity for profile completion if this is the first time
+    if (wasProfileIncomplete && (bio || skills?.length || github || linkedin)) {
+      const TrustLog = require('../models/TrustLog');
+      await TrustLog.logActivity(
+        req.user._id,
+        'profile_completed',
+        TrustLog.getPointsForAction('profile_completed'),
+        'Profile completed with additional information'
+      );
+      
+      // Refresh user data to get updated trust score
+      await user.reload();
+    }
+
     res.json({
       success: true,
       message: 'Profile updated successfully',
-      user: user.publicProfile
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        university: user.university,
+        bio: user.bio,
+        skills: user.skills,
+        github: user.github,
+        linkedin: user.linkedin,
+        trustScore: user.trustScore,
+        isEmailVerified: user.isEmailVerified,
+        role: user.role,
+        profilePicture: user.profilePicture,
+        createdAt: user.createdAt
+      }
     });
   } catch (error) {
     console.error('Update profile error:', error);
@@ -208,13 +241,21 @@ router.get('/search', protect, async (req, res) => {
 // @access  Private
 router.get('/trust-history', protect, async (req, res) => {
   try {
-    const { limit = 20 } = req.query;
+    const TrustLog = require('../models/TrustLog');
     
-    const trustHistory = await TrustLog.getUserTrustHistory(req.user._id, parseInt(limit));
+    // Ensure userId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(req.user._id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID'
+      });
+    }
+    
+    const history = await TrustLog.getUserTrustHistory(req.user._id, 20);
     
     res.json({
       success: true,
-      trustHistory
+      history: history
     });
   } catch (error) {
     console.error('Get trust history error:', error);
@@ -231,6 +272,14 @@ router.get('/trust-history', protect, async (req, res) => {
 router.get('/trust-stats', protect, async (req, res) => {
   try {
     const { days = 30 } = req.query;
+    
+    // Ensure userId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(req.user._id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID'
+      });
+    }
     
     const trustStats = await TrustLog.getTrustStats(req.user._id, parseInt(days));
     

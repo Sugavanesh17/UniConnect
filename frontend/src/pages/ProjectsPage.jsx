@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { 
   FolderOpen, 
@@ -12,12 +12,14 @@ import {
   Globe,
   Calendar, 
   Star,
-  ArrowRight
+  ArrowRight,
+  Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ProjectsPage = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [filteredProjects, setFilteredProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -123,6 +125,35 @@ const ProjectsPage = () => {
     }
   };
 
+  const handleDeleteProject = async (projectId, projectTitle) => {
+    if (!window.confirm(`Are you sure you want to delete "${projectTitle}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+      const response = await fetch(`${API_BASE_URL}/projects/${projectId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        toast.success('Project deleted successfully');
+        fetchProjects(); // Refresh the projects list
+      } else {
+        const data = await response.json();
+        toast.error(data.message || 'Failed to delete project');
+      }
+    } catch (error) {
+      console.error('Delete project error:', error);
+      toast.error('Failed to delete project');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -197,77 +228,92 @@ const ProjectsPage = () => {
       {/* Projects Grid */}
       {filteredProjects.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProjects.map((project) => (
-            <div key={project._id} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 hover:scale-105 group">
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors duration-200">
-                  {project.title}
-                </h3>
-                    <p className="text-gray-600 text-sm line-clamp-3 mb-4">
-                  {project.description}
-                </p>
-              </div>
-                </div>
+          {filteredProjects.map((project) => {
+            const isOwner = project.owner._id === user?._id;
+            const isAdmin = user?.role === 'admin';
+            const canDelete = isOwner || isAdmin;
 
-                <div className="space-y-3">
-                  {/* Project Owner */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                        <span className="text-white text-sm font-medium">
-                          {project.owner?.name?.charAt(0) || 'U'}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {project.owner?.name || 'Unknown'}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {project.owner?.university || 'University'}
-                        </p>
-                      </div>
+            return (
+              <div key={project._id} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 hover:scale-105 group">
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors duration-200">
+                        {project.title}
+                      </h3>
+                      <p className="text-gray-600 text-sm line-clamp-3 mb-4">
+                        {project.description}
+                      </p>
                     </div>
-                    <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center space-x-1 ${getPrivacyColor(project.privacy)} group-hover:scale-105 transition-transform duration-200`}>
-                      {getPrivacyIcon(project.privacy)}
-                      <span>{getPrivacyLabel(project.privacy)}</span>
-                    </div>
-                  </div>
-
-                  {/* Project Stats */}
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-1">
-                    <Users className="w-4 h-4" />
-                        <span>{project.members?.length || 0} members</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="w-4 h-4" />
-                        <span>{new Date(project.createdAt).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                    {project.owner?.trustScore && (
-                      <div className="flex items-center space-x-1">
-                        <Star className="w-4 h-4 text-yellow-500" />
-                        <span>{project.owner.trustScore}</span>
-                      </div>
+                    {canDelete && (
+                      <button
+                        onClick={() => handleDeleteProject(project._id, project.title)}
+                        className="ml-2 p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors duration-200 opacity-0 group-hover:opacity-100"
+                        title="Delete project"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     )}
                   </div>
 
-                  {/* Action Button */}
-                  <Link
-                    to={`/projects/${project._id}`}
-                    className="w-full mt-4 flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium group-hover:scale-105 hover:shadow-md"
-                  >
-                    <span>View Project</span>
-                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
-                  </Link>
+                  <div className="space-y-3">
+                    {/* Project Owner */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                          <span className="text-white text-sm font-medium">
+                            {project.owner?.name?.charAt(0) || 'U'}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            {project.owner?.name || 'Unknown'}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {project.owner?.university || 'University'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center space-x-1 ${getPrivacyColor(project.privacy)} group-hover:scale-105 transition-transform duration-200`}>
+                        {getPrivacyIcon(project.privacy)}
+                        <span>{getPrivacyLabel(project.privacy)}</span>
+                      </div>
+                    </div>
+
+                    {/* Project Stats */}
+                    <div className="flex items-center justify-between text-sm text-gray-500">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-1">
+                          <Users className="w-4 h-4" />
+                          <span>{project.members?.length || 0} members</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <Calendar className="w-4 h-4" />
+                          <span>{new Date(project.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      {project.owner?.trustScore && (
+                        <div className="flex items-center space-x-1">
+                          <Star className="w-4 h-4 text-yellow-500" />
+                          <span>{project.owner.trustScore}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action Button */}
+                    <Link
+                      to={`/projects/${project._id}`}
+                      className="w-full mt-4 flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium group-hover:scale-105 hover:shadow-md"
+                    >
+                      <span>View Project</span>
+                      <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
-        ))}
-      </div>
+            );
+          })}
+        </div>
       ) : (
         <div className="text-center py-12">
           <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />

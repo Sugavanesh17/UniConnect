@@ -1,6 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { protect, canViewProject, canEditProject, projectOwner, hasSignedNDA } = require('../middleware/auth');
+const { protect, canViewProject, canEditProject, projectOwner, hasSignedNDA, canViewProjectDetails } = require('../middleware/auth');
 const Project = require('../models/Project');
 const TrustLog = require('../models/TrustLog');
 const User = require('../models/User');
@@ -24,8 +24,8 @@ router.get('/', protect, async (req, res) => {
       order = 'desc'
     } = req.query;
 
-    // Build filter object
-    const filter = {};
+    // Build filter object - exclude deleted projects
+    const filter = { isDeleted: false };
 
     // Privacy filter
     if (privacy && privacy !== 'all') {
@@ -51,10 +51,19 @@ router.get('/', protect, async (req, res) => {
     }
 
     if (search) {
-      filter.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
-      ];
+      const searchFilter = {
+        $or: [
+          { title: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } }
+        ]
+      };
+      // Merge search filter with existing filter
+      if (filter.$or) {
+        filter.$and = [filter.$or, searchFilter];
+        delete filter.$or;
+      } else {
+        Object.assign(filter, searchFilter);
+      }
     }
 
     if (status && status !== 'all') {
@@ -110,6 +119,7 @@ router.get('/', protect, async (req, res) => {
 router.get('/my-projects', protect, async (req, res) => {
   try {
     const projects = await Project.find({
+      isDeleted: false,
       $or: [
         { owner: req.user._id },
         { 'members.user': req.user._id }
@@ -165,7 +175,7 @@ router.post('/', [
     await TrustLog.logActivity(
       req.user._id,
       'project_created',
-      10,
+      TrustLog.getPointsForAction('project_created'),
       `Created project: ${title}`,
       { projectId: project._id }
     );
@@ -191,21 +201,26 @@ router.get('/dashboard', protect, async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // Get user's projects
+    // Get user's projects (excluding deleted ones)
     const userProjects = await Project.find({
+      isDeleted: false,
       $or: [
         { owner: userId },
         { 'members.user': userId }
       ]
     }).populate('owner', 'name university trustScore');
 
-    // Get user's owned projects
-    const ownedProjects = await Project.find({ owner: userId });
+    // Get user's owned projects (excluding deleted ones)
+    const ownedProjects = await Project.find({ 
+      owner: userId,
+      isDeleted: false 
+    });
     
-    // Get user's joined projects
+    // Get user's joined projects (excluding deleted ones)
     const joinedProjects = await Project.find({
       'members.user': userId,
-      owner: { $ne: userId }
+      owner: { $ne: userId },
+      isDeleted: false
     });
 
     // Calculate stats
@@ -248,22 +263,57 @@ router.get('/dashboard', protect, async (req, res) => {
   }
 });
 
-// @route   GET /api/projects/:projectId
-// @desc    Get project by ID
+// @route   GET /api/projects/:projectId/basic
+// @desc    Get basic project info (public info for non-members)
 // @access  Private
-router.get('/:projectId', protect, canViewProject, hasSignedNDA, async (req, res) => {
+router.get('/:projectId/basic', protect, canViewProject, async (req, res) => {
+  try {
+    const project = req.project;
+    
+    // Return only basic project information
+    const basicInfo = {
+      _id: project._id,
+      title: project.title,
+      description: project.description,
+      privacy: project.privacy,
+      status: project.status,
+      techStack: project.techStack,
+      tags: project.tags,
+      createdAt: project.createdAt,
+      owner: {
+        _id: project.owner._id,
+        name: project.owner.name,
+        university: project.owner.university,
+        trustScore: project.owner.trustScore
+      },
+      memberCount: project.members.length,
+      isOwner: project.owner._id.toString() === req.user._id.toString(),
+      isMember: project.members.some(member => member.user._id.toString() === req.user._id.toString()),
+      hasPendingRequest: project.joinRequests.some(request => 
+        request.user._id.toString() === req.user._id.toString() && request.status === 'pending'
+      )
+    };
+
+    res.json({
+      success: true,
+      project: basicInfo
+    });
+  } catch (error) {
+    console.error('Get basic project info error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error' 
+    });
+  }
+});
+
+// @route   GET /api/projects/:projectId
+// @desc    Get project by ID (members only)
+// @access  Private
+router.get('/:projectId', protect, canViewProjectDetails, hasSignedNDA, async (req, res) => {
   try {
     // Increment view count
     await req.project.incrementView();
-
-    // Log trust activity for project view
-    await TrustLog.logActivity(
-      req.user._id,
-      'project_viewed',
-      1,
-      `Viewed project: ${req.project.title}`,
-      { projectId: req.project._id }
-    );
 
     await req.project.populate('owner', 'name university trustScore');
     await req.project.populate('members.user', 'name university trustScore');
@@ -338,13 +388,44 @@ router.put('/:projectId', [
 
 // @route   DELETE /api/projects/:projectId
 // @desc    Delete project (soft delete)
-// @access  Private (Owner only)
-router.delete('/:projectId', protect, projectOwner, async (req, res) => {
+// @access  Private (Owner or Admin only)
+router.delete('/:projectId', protect, async (req, res) => {
   try {
+    const project = await Project.findById(req.params.projectId);
+    
+    if (!project) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Project not found' 
+      });
+    }
+
+    // Check if user is owner or admin
+    const isOwner = project.owner.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === 'admin';
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Access denied. Only project owner or admin can delete projects.' 
+      });
+    }
+
+    // Soft delete the project
     await Project.findByIdAndUpdate(req.params.projectId, {
       isDeleted: true,
       status: 'cancelled'
     });
+
+    // Log trust activity for project deletion
+    const TrustLog = require('../models/TrustLog');
+    await TrustLog.logActivity(
+      req.user._id,
+      'project_abandoned',
+      TrustLog.getPointsForAction('project_abandoned'),
+      `Deleted project: ${project.title}`,
+      { projectId: project._id, deletedBy: req.user._id }
+    );
 
     res.json({
       success: true,
@@ -360,7 +441,7 @@ router.delete('/:projectId', protect, projectOwner, async (req, res) => {
 });
 
 // @route   POST /api/projects/:projectId/join-request
-// @desc    Request to join a project
+// @desc    Request to join a project (requires owner approval)
 // @access  Private
 router.post('/:projectId/join-request', [
   protect,
@@ -376,10 +457,11 @@ router.post('/:projectId/join-request', [
       });
     }
 
-    if (project.privacy !== 'private') {
-      return res.status(400).json({ 
+    // Check if project is deleted
+    if (project.isDeleted) {
+      return res.status(404).json({ 
         success: false, 
-        message: 'Join requests are only allowed for private projects' 
+        message: 'Project not found' 
       });
     }
 
@@ -419,7 +501,7 @@ router.post('/:projectId/join-request', [
 
     res.json({
       success: true,
-      message: 'Join request sent successfully'
+      message: 'Join request sent successfully. The project owner will review your request.'
     });
   } catch (error) {
     console.error('Join request error:', error);
@@ -459,10 +541,11 @@ router.put('/:projectId/join-request/:requestId', [
       await project.addMember(request.user, 'viewer');
       
       // Log trust activity for joining project
+      const TrustLog = require('../models/TrustLog');
       await TrustLog.logActivity(
         request.user,
         'project_joined',
-        5,
+        TrustLog.getPointsForAction('project_joined'),
         `Joined project: ${project.title}`,
         { projectId: project._id }
       );
@@ -576,6 +659,10 @@ router.put('/:projectId/tasks/:taskId', [
       });
     }
 
+    // Check if task status is being changed to completed
+    const wasCompleted = task.status === 'completed';
+    const isBeingCompleted = status === 'completed' && !wasCompleted;
+
     // Update task fields
     if (title !== undefined) task.title = title;
     if (description !== undefined) task.description = description;
@@ -586,6 +673,18 @@ router.put('/:projectId/tasks/:taskId', [
     task.updatedAt = new Date();
 
     await project.save();
+
+    // Log trust activity for task completion
+    if (isBeingCompleted && task.assignedTo) {
+      const TrustLog = require('../models/TrustLog');
+      await TrustLog.logActivity(
+        task.assignedTo,
+        'task_completed',
+        TrustLog.getPointsForAction('task_completed'),
+        `Completed task: ${task.title}`,
+        { projectId: project._id, taskId: task._id }
+      );
+    }
 
     // Populate the assignedTo field if it exists
     if (task.assignedTo) {

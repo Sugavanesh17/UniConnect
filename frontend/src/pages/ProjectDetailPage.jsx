@@ -16,8 +16,10 @@ import {
   Settings,
   UserPlus,
   Send,
-  Paperclip
+  Paperclip,
+  Trash2
 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 const ProjectDetailPage = () => {
   const { projectId } = useParams();
@@ -62,6 +64,20 @@ const ProjectDetailPage = () => {
       if (response.ok) {
         const data = await response.json();
         setProject(data.project);
+      } else if (response.status === 403) {
+        // User doesn't have access, fetch basic info instead
+        const basicResponse = await fetch(`${API_BASE_URL}/projects/${projectId}/basic`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (basicResponse.ok) {
+          const basicData = await basicResponse.json();
+          setProject(basicData.project);
+        } else {
+          navigate('/projects');
+        }
       } else if (response.status === 404) {
         navigate('/projects');
       }
@@ -88,14 +104,22 @@ const ProjectDetailPage = () => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ message: 'I would like to join this project' })
+        body: JSON.stringify({ 
+          message: `I would like to join ${project.title}. I'm interested in contributing to this project.` 
+        })
       });
 
       if (response.ok) {
-        fetchProject();
+        const data = await response.json();
+        toast.success(data.message || 'Join request sent successfully! The project owner will review your request.');
+        fetchProject(); // Refresh project data to show updated join requests
+      } else {
+        const error = await response.json();
+        toast.error(error.message || 'Failed to send join request');
       }
     } catch (error) {
-      console.error('Error joining project:', error);
+      console.error('Error sending join request:', error);
+      toast.error('Failed to send join request');
     }
   };
 
@@ -179,7 +203,63 @@ const ProjectDetailPage = () => {
 
   const isMember = project.members?.some(member => member.user._id === user?._id);
   const isOwner = project.owner._id === user?._id;
+  const isAdmin = user?.role === 'admin';
   const canEdit = isOwner || (isMember && project.members.find(m => m.user._id === user?._id)?.role === 'contributor');
+  const canDelete = isOwner || isAdmin;
+  const hasFullAccess = isOwner || isMember || isAdmin;
+  const hasPendingRequest = project.hasPendingRequest;
+
+  const handleDeleteProject = async () => {
+    if (!window.confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/projects/${projectId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        toast.success('Project deleted successfully');
+        navigate('/projects');
+      } else {
+        const data = await response.json();
+        toast.error(data.message || 'Failed to delete project');
+      }
+    } catch (error) {
+      console.error('Delete project error:', error);
+      toast.error('Failed to delete project');
+    }
+  };
+
+  const handleJoinRequest = async (requestId, status) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/projects/${projectId}/join-request/${requestId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(data.message || `Join request ${status} successfully`);
+        fetchProject(); // Refresh project data
+      } else {
+        const error = await response.json();
+        toast.error(error.message || `Failed to ${status} join request`);
+      }
+    } catch (error) {
+      console.error('Error handling join request:', error);
+      toast.error(`Failed to ${status} join request`);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -193,15 +273,27 @@ const ProjectDetailPage = () => {
           <span>Back to Projects</span>
         </Link>
         
-        {isOwner && (
-          <Link
-            to={`/projects/${projectId}/settings`}
-            className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-          >
-            <Settings className="w-4 h-4" />
-            <span>Settings</span>
-          </Link>
-        )}
+        <div className="flex items-center space-x-2">
+          {isOwner && (
+            <Link
+              to={`/projects/${projectId}/settings`}
+              className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              <Settings className="w-4 h-4" />
+              <span>Settings</span>
+            </Link>
+          )}
+          
+          {canDelete && (
+            <button
+              onClick={handleDeleteProject}
+              className="flex items-center space-x-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Delete Project</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Project Header */}
@@ -229,14 +321,26 @@ const ProjectDetailPage = () => {
             </div>
           </div>
 
-          {!isMember && !isOwner && project.privacy === 'public' && (
+          {!isMember && !isOwner && !hasPendingRequest && (
             <button
               onClick={handleJoinProject}
               className="bg-primary-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors flex items-center space-x-2"
             >
               <UserPlus className="w-4 h-4" />
-              <span>Join Project</span>
+              <span>Request to Join</span>
             </button>
+          )}
+
+          {hasPendingRequest && (
+            <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg">
+              <span className="text-sm">Join request pending approval</span>
+            </div>
+          )}
+
+          {!isMember && !isOwner && project.privacy === 'draft' && (
+            <div className="text-gray-500 text-sm">
+              This project is in draft mode
+            </div>
           )}
         </div>
 
@@ -258,10 +362,13 @@ const ProjectDetailPage = () => {
         )}
       </div>
 
-      {/* Tabs */}
+      {/* Tabs and Tab Content */}
+      {hasFullAccess ? (
+        <>
+          {/* Tabs */}
           <div className="bg-white/80 backdrop-blur-sm rounded-xl p-2">
             <div className="flex space-x-1">
-          {['overview', 'tasks', 'chat', 'members'].map((tab) => (
+              {['overview', 'tasks', 'chat', 'members'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -274,6 +381,18 @@ const ProjectDetailPage = () => {
                   {tab}
                 </button>
               ))}
+              {isOwner && project.joinRequests?.length > 0 && (
+                <button
+                  onClick={() => setActiveTab('requests')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    activeTab === 'requests'
+                      ? 'bg-primary-600 text-white'
+                      : 'text-gray-600 hover:text-primary-600 hover:bg-gray-100'
+                  }`}
+                >
+                  Join Requests ({project.joinRequests.filter(r => r.status === 'pending').length})
+                </button>
+              )}
             </div>
           </div>
 
@@ -281,9 +400,9 @@ const ProjectDetailPage = () => {
           <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6">
             {activeTab === 'overview' && (
               <div className="space-y-6">
-            <h3 className="text-xl font-semibold text-gray-900">Project Overview</h3>
-            <div className="prose max-w-none">
-              <p className="text-gray-700 leading-relaxed">{project.description}</p>
+                <h3 className="text-xl font-semibold text-gray-900">Project Overview</h3>
+                <div className="prose max-w-none">
+                  <p className="text-gray-700 leading-relaxed">{project.description}</p>
                 </div>
               </div>
             )}
@@ -292,15 +411,15 @@ const ProjectDetailPage = () => {
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h3 className="text-xl font-semibold text-gray-900">Tasks</h3>
-              {canEdit && (
-                  <button
-                    onClick={() => setShowTaskForm(!showTaskForm)}
-                  className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Add Task</span>
-                  </button>
-              )}
+                  {canEdit && (
+                    <button
+                      onClick={() => setShowTaskForm(!showTaskForm)}
+                      className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Add Task</span>
+                    </button>
+                  )}
                 </div>
 
                 {showTaskForm && (
@@ -310,26 +429,26 @@ const ProjectDetailPage = () => {
                       placeholder="Task name"
                       value={newTask.name}
                       onChange={(e) => setNewTask({ ...newTask, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       required
-                      />
-                      <input
-                        type="date"
-                        value={newTask.deadline}
-                        onChange={(e) => setNewTask({ ...newTask, deadline: e.target.value })}
-                  className="px-3 py-2 border border-gray-300 rounded-lg"
-                      />
+                    />
+                    <input
+                      type="date"
+                      value={newTask.deadline}
+                      onChange={(e) => setNewTask({ ...newTask, deadline: e.target.value })}
+                      className="px-3 py-2 border border-gray-300 rounded-lg"
+                    />
                     <div className="flex space-x-2">
                       <button
                         type="submit"
-                    className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700"
+                        className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700"
                       >
                         Create Task
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowTaskForm(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                       >
                         Cancel
                       </button>
@@ -339,29 +458,29 @@ const ProjectDetailPage = () => {
 
                 <div className="space-y-3">
                   {project.tasks?.map((task) => (
-                <div key={task._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div key={task._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">
-                          {getTaskStatusIcon(task.status)}
-                    <span className="font-medium">{task.name}</span>
-                    <span className={`px-2 py-1 text-xs rounded-full ${getTaskStatusColor(task.status)}`}>
-                      {task.status}
-                    </span>
-                        </div>
-                  {canEdit && (
-                      <select
-                        value={task.status}
-                      onChange={(e) => updateTaskStatus(task._id, e.target.value)}
-                      className="px-2 py-1 border border-gray-300 rounded text-sm"
-                      >
-                        <option value="todo">To Do</option>
-                        <option value="in-progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                      </select>
-                  )}
+                        {getTaskStatusIcon(task.status)}
+                        <span className="font-medium">{task.name}</span>
+                        <span className={`px-2 py-1 text-xs rounded-full ${getTaskStatusColor(task.status)}`}>
+                          {task.status}
+                        </span>
+                      </div>
+                      {canEdit && (
+                        <select
+                          value={task.status}
+                          onChange={(e) => updateTaskStatus(task._id, e.target.value)}
+                          className="px-2 py-1 border border-gray-300 rounded text-sm"
+                        >
+                          <option value="todo">To Do</option>
+                          <option value="in-progress">In Progress</option>
+                          <option value="completed">Completed</option>
+                        </select>
+                      )}
                     </div>
                   ))}
                   {(!project.tasks || project.tasks.length === 0) && (
-                <p className="text-gray-500 text-center py-8">No tasks yet</p>
+                    <p className="text-gray-500 text-center py-8">No tasks yet</p>
                   )}
                 </div>
               </div>
@@ -369,70 +488,149 @@ const ProjectDetailPage = () => {
 
             {activeTab === 'chat' && (
               <div className="space-y-4">
-            <h3 className="text-xl font-semibold text-gray-900">Project Chat</h3>
-            <div className="h-96 bg-gray-50 rounded-lg p-4 overflow-y-auto">
-              {messages.map((message, index) => (
-                <div key={index} className="mb-4">
-                  <div className="flex items-start space-x-3">
-                    <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                      {message.userName?.charAt(0)?.toUpperCase()}
+                <h3 className="text-xl font-semibold text-gray-900">Project Chat</h3>
+                <div className="h-96 bg-gray-50 rounded-lg p-4 overflow-y-auto">
+                  {messages.map((message, index) => (
+                    <div key={index} className="mb-4">
+                      <div className="flex items-start space-x-3">
+                        <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                          {message.userName?.charAt(0)?.toUpperCase()}
                         </div>
-                    <div>
-                      <div className="font-medium text-gray-900">{message.userName}</div>
-                      <div className="text-gray-700">{message.message}</div>
+                        <div>
+                          <div className="font-medium text-gray-900">{message.userName}</div>
+                          <div className="text-gray-700">{message.message}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <form onSubmit={handleSendMessage} className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <button
+                    type="submit"
+                    className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {activeTab === 'members' && (
+              <div className="space-y-6">
+                <h3 className="text-xl font-semibold text-gray-900">Project Members</h3>
+                <div className="space-y-4">
+                  {project.members?.map((member) => (
+                    <div key={member.user._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white font-semibold">
+                          {member.user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">{member.user.name}</div>
+                          <div className="text-sm text-gray-600">{member.user.university}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          member.role === 'owner' ? 'bg-purple-100 text-purple-800' :
+                          member.role === 'contributor' ? 'bg-blue-100 text-blue-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {member.role}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'requests' && (
+              <div className="space-y-6">
+                <h3 className="text-xl font-semibold text-gray-900">Join Requests</h3>
+                <div className="space-y-4">
+                  {project.joinRequests?.map((request) => (
+                    <div key={request._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white font-semibold">
+                          {request.user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">{request.user.name}</div>
+                          <div className="text-sm text-gray-600">{request.user.university}</div>
+                          {request.message && (
+                            <div className="text-sm text-gray-500 mt-1">"{request.message}"</div>
+                          )}
+                          <div className="text-xs text-gray-400 mt-1">
+                            Requested {new Date(request.requestedAt).toLocaleDateString()}
                           </div>
                         </div>
                       </div>
-                    ))}
+                      <div className="flex items-center space-x-2">
+                        {request.status === 'pending' ? (
+                          <>
+                            <button
+                              onClick={() => handleJoinRequest(request._id, 'approved')}
+                              className="px-3 py-1 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleJoinRequest(request._id, 'rejected')}
+                              className="px-3 py-1 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        ) : (
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            request.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {request.status}
+                          </span>
+                        )}
                       </div>
-            <form onSubmit={handleSendMessage} className="flex space-x-2">
-                      <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type a message..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg"
-                      />
-                      <button
-                        type="submit"
-                className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700"
-                      >
-                        <Send className="w-4 h-4" />
-                      </button>
-            </form>
-          </div>
-        )}
-
-        {activeTab === 'members' && (
-          <div className="space-y-6">
-            <h3 className="text-xl font-semibold text-gray-900">Project Members</h3>
-            <div className="space-y-4">
-              {project.members?.map((member) => (
-                <div key={member.user._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white font-semibold">
-                      {member.user.name.charAt(0).toUpperCase()}
                     </div>
-                    <div>
-                      <div className="font-medium text-gray-900">{member.user.name}</div>
-                      <div className="text-sm text-gray-600">{member.user.university}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className={`px-2 py-1 text-xs rounded-full ${
-                      member.role === 'owner' ? 'bg-purple-100 text-purple-800' :
-                      member.role === 'contributor' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {member.role}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                  ))}
+                  {(!project.joinRequests || project.joinRequests.length === 0) && (
+                    <p className="text-gray-500 text-center py-8">No join requests</p>
+                  )}
                 </div>
               </div>
             )}
           </div>
+        </>
+      ) : (
+        // Restricted access view for non-members
+        <div className="bg-white/80 backdrop-blur-sm rounded-xl p-8 text-center">
+          <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">Access Restricted</h3>
+          <p className="text-gray-600 mb-6">
+            You need to be a member of this project to view its details, tasks, and chat.
+          </p>
+          {!hasPendingRequest && (
+            <button
+              onClick={handleJoinProject}
+              className="bg-primary-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-700 transition-colors flex items-center space-x-2 mx-auto"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Request to Join</span>
+            </button>
+          )}
+          {hasPendingRequest && (
+            <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg inline-block">
+              <span className="text-sm">Join request pending approval</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

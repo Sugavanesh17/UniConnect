@@ -90,7 +90,48 @@ const canEditProject = async (req, res, next) => {
   }
 };
 
-// Middleware to check if user can view project
+// Middleware to check if user can view project details (members only)
+const canViewProjectDetails = async (req, res, next) => {
+  try {
+    const Project = require('../models/Project');
+    const project = await Project.findById(req.params.projectId);
+    
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check if project is deleted
+    if (project.isDeleted) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Allow project owner to view details
+    if (project.owner.toString() === req.user._id.toString()) {
+      req.project = project;
+      return next();
+    }
+
+    // Check if user is a member of the project
+    const isMember = project.members.some(member => 
+      member.user.toString() === req.user._id.toString()
+    );
+
+    if (!isMember) {
+      return res.status(403).json({ 
+        message: 'You must be a member of this project to view its details. Please request to join first.',
+        requiresJoin: true
+      });
+    }
+
+    req.project = project;
+    next();
+  } catch (error) {
+    console.error('Project details view check error:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Middleware to check if user can view project (for basic info like title, description)
 const canViewProject = async (req, res, next) => {
   try {
     const Project = require('../models/Project');
@@ -141,5 +182,6 @@ module.exports = {
   projectOwner,
   canEditProject,
   canViewProject,
+  canViewProjectDetails,
   hasSignedNDA
 }; 

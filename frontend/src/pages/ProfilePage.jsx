@@ -12,13 +12,15 @@ import {
   Plus,
   Star,
   Calendar,
-  Award
+  Award,
+  RefreshCw
 } from 'lucide-react';
 
 const ProfilePage = () => {
-  const { user, token, updateUser } = useAuth();
+  const { user, token, updateUser, refreshUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [skillInput, setSkillInput] = useState('');
   
@@ -31,7 +33,15 @@ const ProfilePage = () => {
     linkedin: user?.linkedin || ''
   });
 
+  const [trustHistory, setTrustHistory] = useState([]);
+  const [loadingTrustHistory, setLoadingTrustHistory] = useState(false);
+
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+  useEffect(() => {
+    // Refresh user data when component mounts
+    refreshUserData();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -45,6 +55,38 @@ const ProfilePage = () => {
       });
     }
   }, [user]);
+
+  const refreshUserData = async () => {
+    setRefreshing(true);
+    try {
+      await refreshUser();
+      await fetchTrustHistory();
+    } catch (error) {
+      console.error('Failed to refresh user data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const fetchTrustHistory = async () => {
+    setLoadingTrustHistory(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/trust-history`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setTrustHistory(data.history || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch trust history:', error);
+    } finally {
+      setLoadingTrustHistory(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -113,24 +155,38 @@ const ProfilePage = () => {
   };
 
   const getTrustScoreColor = (score) => {
+    if (score >= 90) return 'text-purple-600 bg-purple-100';
     if (score >= 80) return 'text-green-600 bg-green-100';
-    if (score >= 60) return 'text-blue-600 bg-blue-100';
-    if (score >= 40) return 'text-yellow-600 bg-yellow-100';
+    if (score >= 70) return 'text-blue-600 bg-blue-100';
+    if (score >= 60) return 'text-yellow-600 bg-yellow-100';
+    if (score >= 40) return 'text-orange-600 bg-orange-100';
     return 'text-red-600 bg-red-100';
   };
 
   const getTrustScoreLabel = (score) => {
+    if (score >= 90) return 'Elite';
     if (score >= 80) return 'Excellent';
-    if (score >= 60) return 'Good';
-    if (score >= 40) return 'Fair';
-    return 'Building';
+    if (score >= 70) return 'Good';
+    if (score >= 60) return 'Fair';
+    if (score >= 40) return 'Building';
+    return 'New';
   };
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       {/* Header */}
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
+        <div className="flex items-center justify-center space-x-4">
+          <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
+          <button
+            onClick={refreshUserData}
+            disabled={refreshing}
+            className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all duration-200 disabled:opacity-50"
+            title="Refresh profile data"
+          >
+            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
         <p className="text-gray-600 mt-2">Manage your UniConnect profile and settings</p>
       </div>
 
@@ -360,6 +416,57 @@ const ProfilePage = () => {
             )}
           </div>
         </form>
+      </div>
+
+      {/* Trust Score History */}
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-semibold text-gray-900">Trust Score History</h3>
+          <button
+            onClick={fetchTrustHistory}
+            disabled={loadingTrustHistory}
+            className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all duration-200 disabled:opacity-50"
+            title="Refresh trust history"
+          >
+            <RefreshCw className={`w-4 h-4 ${loadingTrustHistory ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+
+        {loadingTrustHistory ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="text-gray-600 mt-2">Loading trust history...</p>
+          </div>
+        ) : trustHistory.length > 0 ? (
+          <div className="space-y-4">
+            {trustHistory.map((log, index) => (
+              <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                <div className="flex items-center space-x-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    log.points > 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                  }`}>
+                    {log.points > 0 ? '+' : ''}{log.points}
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">{log.description}</p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(log.createdAt).toLocaleDateString()} at {new Date(log.createdAt).toLocaleTimeString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-sm text-gray-500 capitalize">
+                  {log.action.replace(/_/g, ' ')}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Star className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No trust score history yet</p>
+            <p className="text-sm text-gray-500 mt-1">Complete projects and collaborate to build your trust score</p>
+          </div>
+        )}
       </div>
 
       {/* Trust Score Info */}

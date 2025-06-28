@@ -81,8 +81,15 @@ const Navbar = () => {
                 >
                   <User className="w-4 h-4" />
                   <span>{user?.name}</span>
-                  <span className="ml-2 px-2 py-1 text-xs bg-gradient-to-r from-green-400 to-green-600 text-white rounded-full hover:scale-110 transition-transform duration-200">
-                    {user?.trustScore}
+                  <span className={`ml-2 px-2 py-1 text-xs rounded-full font-medium ${
+                    (user?.trustScore || 0) >= 90 ? 'bg-purple-100 text-purple-700' :
+                    (user?.trustScore || 0) >= 80 ? 'bg-green-100 text-green-700' :
+                    (user?.trustScore || 0) >= 70 ? 'bg-blue-100 text-blue-700' :
+                    (user?.trustScore || 0) >= 60 ? 'bg-yellow-100 text-yellow-700' :
+                    (user?.trustScore || 0) >= 40 ? 'bg-orange-100 text-orange-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
+                    {user?.trustScore || 0}
                   </span>
                 </Link>
                 <button
@@ -156,8 +163,15 @@ const Navbar = () => {
                 >
                   <User className="w-5 h-5" />
                   <span>{user?.name}</span>
-                  <span className="ml-auto px-2 py-1 text-xs bg-gradient-to-r from-green-400 to-green-600 text-white rounded-full">
-                    {user?.trustScore}
+                  <span className={`ml-2 px-2 py-1 text-xs rounded-full font-medium ${
+                    (user?.trustScore || 0) >= 90 ? 'bg-purple-100 text-purple-700' :
+                    (user?.trustScore || 0) >= 80 ? 'bg-green-100 text-green-700' :
+                    (user?.trustScore || 0) >= 70 ? 'bg-blue-100 text-blue-700' :
+                    (user?.trustScore || 0) >= 60 ? 'bg-yellow-100 text-yellow-700' :
+                    (user?.trustScore || 0) >= 40 ? 'bg-orange-100 text-orange-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
+                    {user?.trustScore || 0}
                   </span>
                 </Link>
                 <button
