@@ -57,7 +57,7 @@ router.post('/register', [
       skills: skills || [],
       github: github || '',
       linkedin: linkedin || '',
-      role: 'student'
+      role: 'user'
     });
 
     // Log trust activity for account creation

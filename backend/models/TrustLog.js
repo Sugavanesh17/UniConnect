@@ -98,7 +98,7 @@ trustLogSchema.statics.getTrustStats = function(userId, days = 30) {
   return this.aggregate([
     {
       $match: {
-        user: mongoose.Types.ObjectId(userId),
+        user: new mongoose.Types.ObjectId(userId),
         createdAt: { $gte: startDate }
       }
     },

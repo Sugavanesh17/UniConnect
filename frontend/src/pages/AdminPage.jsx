@@ -400,7 +400,7 @@ const AdminPage = () => {
         {activeTab === 'reports' && (
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-gray-900">Reports & Flags</h3>
-            <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-gray-500">
               <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
               <p>No reports available</p>
             </div>

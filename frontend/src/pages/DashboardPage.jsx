@@ -6,7 +6,7 @@ import {
   Users, 
   Star, 
   TrendingUp, 
-  Clock, 
+  Clock,
   Plus,
   ArrowRight,
   Activity,
@@ -64,14 +64,14 @@ const DashboardPage = () => {
           <p className="text-gray-600 mt-2">
             Welcome back, {user?.name}! Here's what's happening with your projects.
           </p>
-        </div>
-        <Link
-          to="/projects/create"
+            </div>
+            <Link
+              to="/projects/create"
           className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 font-medium hover:scale-105 hover:shadow-lg"
-        >
+            >
           <Plus className="w-4 h-4 mr-2" />
           Create Project
-        </Link>
+            </Link>
       </div>
 
       {/* Stats Cards */}
@@ -149,7 +149,7 @@ const DashboardPage = () => {
           </div>
 
           {dashboardData?.recentProjects && dashboardData.recentProjects.length > 0 ? (
-            <div className="space-y-4">
+          <div className="space-y-4">
               {dashboardData.recentProjects.map((project) => (
                 <div key={project._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200 hover:scale-105">
                   <div className="flex items-center justify-between">
@@ -180,44 +180,44 @@ const DashboardPage = () => {
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-8">
-              <FolderOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            ) : (
+              <div className="text-center py-8">
+                <FolderOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600 mb-4">No projects yet</p>
-              <Link
-                to="/projects/create"
+                <Link
+                  to="/projects/create"
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium hover:scale-105"
-              >
+                >
                 <Plus className="w-4 h-4 mr-2" />
                 Create Your First Project
-              </Link>
-            </div>
-          )}
-        </div>
+                </Link>
+              </div>
+            )}
+          </div>
 
         {/* Recent Activities */}
         <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow duration-300">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-900">Recent Activities</h2>
             <Activity className="w-5 h-5 text-gray-400" />
-          </div>
+        </div>
 
           {dashboardData?.recentActivities && dashboardData.recentActivities.length > 0 ? (
-            <div className="space-y-4">
+          <div className="space-y-4">
               {dashboardData.recentActivities.map((activity, index) => (
                 <div key={index} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200">
                   <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                     <Activity className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
+                </div>
+                <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-900">{activity.description}</p>
                     <p className="text-xs text-gray-500 mt-1">
                       {new Date(activity.timestamp).toLocaleDateString()}
                     </p>
-                  </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
+          </div>
           ) : (
             <div className="text-center py-8">
               <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -244,7 +244,7 @@ const DashboardPage = () => {
             </div>
           </Link>
 
-          <Link
+            <Link
             to="/projects"
             className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-all duration-200 hover:scale-105 group"
           >
@@ -255,7 +255,7 @@ const DashboardPage = () => {
               <h3 className="font-medium text-gray-900">Browse Projects</h3>
               <p className="text-sm text-gray-600">Find projects to join</p>
             </div>
-          </Link>
+            </Link>
 
           <Link
             to="/users"
@@ -267,7 +267,7 @@ const DashboardPage = () => {
             <div>
               <h3 className="font-medium text-gray-900">Find Collaborators</h3>
               <p className="text-sm text-gray-600">Connect with other students</p>
-            </div>
+          </div>
           </Link>
         </div>
       </div>

@@ -67,17 +67,17 @@ const LoginPage = () => {
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-gray-400" />
                 </div>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
+              <input
+                id="email"
+                name="email"
+                type="email"
                   autoComplete="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
+                required
+                value={formData.email}
+                onChange={handleChange}
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="Enter your email"
-                />
+                placeholder="Enter your email"
+              />
               </div>
             </div>
 
@@ -152,7 +152,7 @@ const LoginPage = () => {
               </Link>
             </p>
           </div>
-        </div>
+            </div>
 
         <div className="text-center">
           <p className="text-xs text-gray-500">

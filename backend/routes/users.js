@@ -273,7 +273,7 @@ router.post('/register', async (req, res) => {
       github,
       linkedin,
       trustScore: 50, // Starting trust score
-      role: 'student'
+      role: 'user'
     });
 
     await user.save();

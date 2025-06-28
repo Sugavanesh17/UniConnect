@@ -232,17 +232,17 @@ const ProfilePage = () => {
             <label htmlFor="skills" className="block text-sm font-medium text-gray-700 mb-2">
               Skills & Technologies
             </label>
-            <div className="flex space-x-2 mb-3">
-              <input
+              <div className="flex space-x-2 mb-3">
+                <input
                 id="skills"
-                type="text"
-                value={skillInput}
-                onChange={(e) => setSkillInput(e.target.value)}
-                onKeyPress={handleSkillKeyPress}
+                  type="text"
+                  value={skillInput}
+                  onChange={(e) => setSkillInput(e.target.value)}
+                  onKeyPress={handleSkillKeyPress}
                 disabled={!isEditing}
                 className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all disabled:bg-gray-50 disabled:text-gray-500"
                 placeholder="e.g., React, Python, Machine Learning"
-              />
+                />
               {isEditing && (
                 <button
                   type="button"
@@ -253,29 +253,29 @@ const ProfilePage = () => {
                   <span>Add</span>
                 </button>
               )}
-            </div>
+              </div>
             
             {formData.skills.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {formData.skills.map((skill, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-primary-100 text-primary-800"
-                  >
-                    {skill}
-                    {isEditing && (
-                      <button
-                        type="button"
-                        onClick={() => removeSkill(skill)}
-                        className="ml-2 text-primary-600 hover:text-primary-800 transition-colors"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </span>
-                ))}
+            <div className="flex flex-wrap gap-2">
+              {formData.skills.map((skill, index) => (
+                <span
+                  key={index}
+                  className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-primary-100 text-primary-800"
+                >
+                  {skill}
+                  {isEditing && (
+                    <button
+                      type="button"
+                      onClick={() => removeSkill(skill)}
+                      className="ml-2 text-primary-600 hover:text-primary-800 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </span>
+              ))}
               </div>
-            )}
+              )}
           </div>
 
           {/* Social Links */}

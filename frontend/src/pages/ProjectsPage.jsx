@@ -6,11 +6,11 @@ import {
   Users, 
   Search, 
   Filter, 
-  Plus,
+  Plus, 
   Eye,
   Lock,
   Globe,
-  Calendar,
+  Calendar, 
   Star,
   ArrowRight
 } from 'lucide-react';
@@ -155,16 +155,16 @@ const ProjectsPage = () => {
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Search */}
           <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search projects..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search projects..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-              />
-            </div>
+            />
+          </div>
           </div>
 
           {/* Filters */}
@@ -180,16 +180,16 @@ const ProjectsPage = () => {
               <option value="protected">Protected</option>
             </select>
 
-            <select
+          <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
-            >
+          >
               <option value="recent">Most Recent</option>
               <option value="oldest">Oldest</option>
               <option value="members">Most Members</option>
               <option value="name">Name A-Z</option>
-            </select>
+          </select>
           </div>
         </div>
       </div>
@@ -203,12 +203,12 @@ const ProjectsPage = () => {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <h3 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors duration-200">
-                      {project.title}
-                    </h3>
+                  {project.title}
+                </h3>
                     <p className="text-gray-600 text-sm line-clamp-3 mb-4">
-                      {project.description}
-                    </p>
-                  </div>
+                  {project.description}
+                </p>
+              </div>
                 </div>
 
                 <div className="space-y-3">
@@ -237,9 +237,9 @@ const ProjectsPage = () => {
 
                   {/* Project Stats */}
                   <div className="flex items-center justify-between text-sm text-gray-500">
-                    <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-4">
                       <div className="flex items-center space-x-1">
-                        <Users className="w-4 h-4" />
+                    <Users className="w-4 h-4" />
                         <span>{project.members?.length || 0} members</span>
                       </div>
                       <div className="flex items-center space-x-1">
@@ -266,8 +266,8 @@ const ProjectsPage = () => {
                 </div>
               </div>
             </div>
-          ))}
-        </div>
+        ))}
+      </div>
       ) : (
         <div className="text-center py-12">
           <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -281,13 +281,13 @@ const ProjectsPage = () => {
             }
           </p>
           {!searchTerm && filter === 'all' && (
-            <Link
-              to="/projects/create"
+          <Link
+            to="/projects/create"
               className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
-            >
+          >
               <Plus className="w-5 h-5 mr-2" />
               Create First Project
-            </Link>
+          </Link>
           )}
         </div>
       )}

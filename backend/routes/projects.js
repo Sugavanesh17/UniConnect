@@ -138,9 +138,12 @@ router.post('/', [
   body('tags').optional().isArray().withMessage('Tags must be an array')
 ], async (req, res) => {
   try {
+    console.log('Received project creation request:', req.body); // Debug log
+    
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array()); // Debug log
       return res.status(400).json({ 
         success: false, 
         errors: errors.array() 
@@ -180,6 +183,68 @@ router.post('/', [
       success: false, 
       message: 'Server error' 
     });
+  }
+});
+
+// Dashboard route - get user stats and recent data
+router.get('/dashboard', protect, async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Get user's projects
+    const userProjects = await Project.find({
+      $or: [
+        { owner: userId },
+        { 'members.user': userId }
+      ]
+    }).populate('owner', 'name university trustScore');
+
+    // Get user's owned projects
+    const ownedProjects = await Project.find({ owner: userId });
+    
+    // Get user's joined projects
+    const joinedProjects = await Project.find({
+      'members.user': userId,
+      owner: { $ne: userId }
+    });
+
+    // Calculate stats
+    const stats = {
+      totalProjects: userProjects.length,
+      activeProjects: userProjects.filter(p => p.status === 'active').length,
+      totalCollaborators: userProjects.reduce((acc, project) => {
+        return acc + (project.members?.length || 0);
+      }, 0),
+      trustScore: req.user.trustScore || 50
+    };
+
+    // Get recent projects (last 5)
+    const recentProjects = userProjects
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 5);
+
+    // Get recent activities (mock data for now)
+    const recentActivities = [
+      {
+        description: 'You joined a new project',
+        timestamp: new Date(),
+        type: 'project_joined'
+      },
+      {
+        description: 'Your trust score increased',
+        timestamp: new Date(Date.now() - 86400000), // 1 day ago
+        type: 'trust_increased'
+      }
+    ];
+
+    res.json({
+      stats,
+      recentProjects,
+      recentActivities
+    });
+  } catch (error) {
+    console.error('Dashboard error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -620,68 +685,6 @@ router.post('/:projectId/sign-nda', protect, canViewProject, async (req, res) =>
       success: false, 
       message: 'Server error' 
     });
-  }
-});
-
-// Dashboard route - get user stats and recent data
-router.get('/dashboard', protect, async (req, res) => {
-  try {
-    const userId = req.user._id;
-
-    // Get user's projects
-    const userProjects = await Project.find({
-      $or: [
-        { owner: userId },
-        { 'members.user': userId }
-      ]
-    }).populate('owner', 'name university trustScore');
-
-    // Get user's owned projects
-    const ownedProjects = await Project.find({ owner: userId });
-    
-    // Get user's joined projects
-    const joinedProjects = await Project.find({
-      'members.user': userId,
-      owner: { $ne: userId }
-    });
-
-    // Calculate stats
-    const stats = {
-      totalProjects: userProjects.length,
-      activeProjects: userProjects.filter(p => p.status === 'active').length,
-      totalCollaborators: userProjects.reduce((acc, project) => {
-        return acc + (project.members?.length || 0);
-      }, 0),
-      trustScore: req.user.trustScore || 50
-    };
-
-    // Get recent projects (last 5)
-    const recentProjects = userProjects
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 5);
-
-    // Get recent activities (mock data for now)
-    const recentActivities = [
-      {
-        description: 'You joined a new project',
-        timestamp: new Date(),
-        type: 'project_joined'
-      },
-      {
-        description: 'Your trust score increased',
-        timestamp: new Date(Date.now() - 86400000), // 1 day ago
-        type: 'trust_increased'
-      }
-    ];
-
-    res.json({
-      stats,
-      recentProjects,
-      recentActivities
-    });
-  } catch (error) {
-    console.error('Dashboard error:', error);
-    res.status(500).json({ message: 'Server error' });
   }
 });
 

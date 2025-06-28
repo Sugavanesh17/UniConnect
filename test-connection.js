@@ -1,4 +1,5 @@
-const fetch = require('node-fetch');
+// Using built-in fetch (available in Node.js 18+)
+// If you're using an older version, install node-fetch: npm install node-fetch
 
 const API_BASE_URL = 'http://localhost:5000/api';
 

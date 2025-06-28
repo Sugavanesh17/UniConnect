@@ -62,7 +62,7 @@ const HomePage = () => {
         <div className="max-w-4xl mx-auto">
           <h1 className="text-5xl md:text-6xl font-bold mb-6">
             <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Connect. Collaborate. Create.
+            Connect. Collaborate. Create.
             </span>
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
@@ -71,11 +71,11 @@ const HomePage = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {!isAuthenticated ? (
-              <>
-                <Link
-                  to="/register"
+            <>
+              <Link
+                to="/register"
                   className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 hover:shadow-lg flex items-center justify-center space-x-2"
-                >
+              >
                   <span>Get Started</span>
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" />
                 </Link>
@@ -84,7 +84,7 @@ const HomePage = () => {
                   className="border-2 border-blue-600 text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-all duration-300 transform hover:scale-105 hover:shadow-md"
                 >
                   Sign In
-                </Link>
+              </Link>
               </>
             ) : (
               <Link
@@ -94,7 +94,7 @@ const HomePage = () => {
                 <span>Go to Dashboard</span>
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" />
               </Link>
-            )}
+          )}
           </div>
         </div>
       </section>

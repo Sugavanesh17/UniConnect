@@ -70,10 +70,10 @@ const RegisterPage = () => {
 
         <div className="bg-white rounded-xl shadow-lg p-8">
           <form className="space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
                 Full Name
-              </label>
+                </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <User className="h-5 w-5 text-gray-400" />
@@ -90,12 +90,12 @@ const RegisterPage = () => {
                   placeholder="Enter your full name"
                 />
               </div>
-            </div>
+              </div>
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 Email address
-              </label>
+                </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-gray-400" />
@@ -122,17 +122,17 @@ const RegisterPage = () => {
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Building className="h-5 w-5 text-gray-400" />
                 </div>
-                <input
-                  id="university"
-                  name="university"
-                  type="text"
+              <input
+                id="university"
+                name="university"
+                type="text"
                   autoComplete="organization"
-                  required
-                  value={formData.university}
-                  onChange={handleChange}
+                required
+                value={formData.university}
+                onChange={handleChange}
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                   placeholder="Enter your university name"
-                />
+              />
               </div>
             </div>
 
@@ -176,7 +176,7 @@ const RegisterPage = () => {
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-gray-400" />
-                </div>
+            </div>
                 <input
                   id="confirmPassword"
                   name="confirmPassword"
@@ -200,10 +200,10 @@ const RegisterPage = () => {
                   )}
                 </button>
               </div>
-            </div>
+              </div>
 
             <div className="flex items-center">
-              <input
+                <input
                 id="agree-terms"
                 name="agree-terms"
                 type="checkbox"

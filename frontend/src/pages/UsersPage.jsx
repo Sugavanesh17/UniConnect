@@ -118,16 +118,16 @@ const UsersPage = () => {
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Search */}
           <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
                 placeholder="Search users..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-              />
-            </div>
+            />
+          </div>
           </div>
 
           {/* Filters */}
@@ -163,7 +163,7 @@ const UsersPage = () => {
             <div key={userItem._id} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 hover:scale-105 group">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
                       <span className="text-white text-lg font-medium">
                         {userItem.name.charAt(0)}
@@ -182,7 +182,7 @@ const UsersPage = () => {
                     {userItem.trustScore}
                   </div>
                 </div>
-
+                
                 <div className="space-y-3">
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <Mail className="w-4 h-4" />
@@ -192,44 +192,44 @@ const UsersPage = () => {
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <Building className="w-4 h-4" />
                     <span className="truncate">{userItem.university}</span>
-                  </div>
+                </div>
 
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <Calendar className="w-4 h-4" />
                     <span>Joined {new Date(userItem.createdAt).toLocaleDateString()}</span>
-                  </div>
+              </div>
 
                   {userItem.skills && userItem.skills.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1">
                       {userItem.skills.slice(0, 3).map((skill, index) => (
-                        <span
-                          key={index}
+                    <span
+                      key={index}
                           className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full hover:scale-105 transition-transform duration-200"
-                        >
-                          {skill}
-                        </span>
-                      ))}
+                    >
+                      {skill}
+                    </span>
+                  ))}
                       {userItem.skills.length > 3 && (
-                        <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
+                    <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
                           +{userItem.skills.length - 3}
-                        </span>
-                      )}
-                    </div>
+                    </span>
                   )}
+                </div>
+              )}
 
                   {/* Action Button */}
                   <Link
                     to={`/profile/${userItem._id}`}
                     className="w-full mt-4 flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium group-hover:scale-105 hover:shadow-md"
-                  >
+                    >
                     <span>View Profile</span>
                     <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
                   </Link>
                 </div>
-              </div>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
+      </div>
       ) : (
         <div className="text-center py-12">
           <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />

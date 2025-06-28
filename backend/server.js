@@ -17,7 +17,6 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const projectRoutes = require('./routes/projects');
 const adminRoutes = require('./routes/admin');
-const taskRoutes = require('./routes/tasks');
 
 // Import middleware
 const { errorHandler } = require('./middleware/errorHandler');
@@ -60,7 +59,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/projects', taskRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

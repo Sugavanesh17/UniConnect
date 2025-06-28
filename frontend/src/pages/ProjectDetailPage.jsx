@@ -228,7 +228,7 @@ const ProjectDetailPage = () => {
               </span>
             </div>
           </div>
-          
+
           {!isMember && !isOwner && project.privacy === 'public' && (
             <button
               onClick={handleJoinProject}
@@ -259,116 +259,116 @@ const ProjectDetailPage = () => {
       </div>
 
       {/* Tabs */}
-      <div className="bg-white/80 backdrop-blur-sm rounded-xl p-2">
-        <div className="flex space-x-1">
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl p-2">
+            <div className="flex space-x-1">
           {['overview', 'tasks', 'chat', 'members'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors capitalize ${
-                activeTab === tab
-                  ? 'bg-primary-600 text-white'
-                  : 'text-gray-600 hover:text-primary-600 hover:bg-gray-100'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-      </div>
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors capitalize ${
+                    activeTab === tab
+                      ? 'bg-primary-600 text-white'
+                      : 'text-gray-600 hover:text-primary-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      {/* Tab Content */}
-      <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6">
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
+          {/* Tab Content */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl p-6">
+            {activeTab === 'overview' && (
+              <div className="space-y-6">
             <h3 className="text-xl font-semibold text-gray-900">Project Overview</h3>
             <div className="prose max-w-none">
               <p className="text-gray-700 leading-relaxed">{project.description}</p>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'tasks' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xl font-semibold text-gray-900">Tasks</h3>
-              {canEdit && (
-                <button
-                  onClick={() => setShowTaskForm(!showTaskForm)}
-                  className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Task</span>
-                </button>
-              )}
-            </div>
-
-            {showTaskForm && (
-              <form onSubmit={handleCreateTask} className="bg-gray-50 p-4 rounded-lg space-y-4">
-                <input
-                  type="text"
-                  placeholder="Task name"
-                  value={newTask.name}
-                  onChange={(e) => setNewTask({ ...newTask, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  required
-                />
-                <input
-                  type="date"
-                  value={newTask.deadline}
-                  onChange={(e) => setNewTask({ ...newTask, deadline: e.target.value })}
-                  className="px-3 py-2 border border-gray-300 rounded-lg"
-                />
-                <div className="flex space-x-2">
-                  <button
-                    type="submit"
-                    className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700"
-                  >
-                    Create Task
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowTaskForm(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
                 </div>
-              </form>
+              </div>
             )}
 
-            <div className="space-y-3">
-              {project.tasks?.map((task) => (
+            {activeTab === 'tasks' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-semibold text-gray-900">Tasks</h3>
+              {canEdit && (
+                  <button
+                    onClick={() => setShowTaskForm(!showTaskForm)}
+                  className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Task</span>
+                  </button>
+              )}
+                </div>
+
+                {showTaskForm && (
+                  <form onSubmit={handleCreateTask} className="bg-gray-50 p-4 rounded-lg space-y-4">
+                    <input
+                      type="text"
+                      placeholder="Task name"
+                      value={newTask.name}
+                      onChange={(e) => setNewTask({ ...newTask, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      required
+                      />
+                      <input
+                        type="date"
+                        value={newTask.deadline}
+                        onChange={(e) => setNewTask({ ...newTask, deadline: e.target.value })}
+                  className="px-3 py-2 border border-gray-300 rounded-lg"
+                      />
+                    <div className="flex space-x-2">
+                      <button
+                        type="submit"
+                    className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700"
+                      >
+                        Create Task
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowTaskForm(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <div className="space-y-3">
+                  {project.tasks?.map((task) => (
                 <div key={task._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    {getTaskStatusIcon(task.status)}
+                      <div className="flex items-center space-x-3">
+                          {getTaskStatusIcon(task.status)}
                     <span className="font-medium">{task.name}</span>
                     <span className={`px-2 py-1 text-xs rounded-full ${getTaskStatusColor(task.status)}`}>
                       {task.status}
                     </span>
-                  </div>
+                        </div>
                   {canEdit && (
-                    <select
-                      value={task.status}
+                      <select
+                        value={task.status}
                       onChange={(e) => updateTaskStatus(task._id, e.target.value)}
                       className="px-2 py-1 border border-gray-300 rounded text-sm"
-                    >
-                      <option value="todo">To Do</option>
-                      <option value="in-progress">In Progress</option>
-                      <option value="completed">Completed</option>
-                    </select>
+                      >
+                        <option value="todo">To Do</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                  )}
+                    </div>
+                  ))}
+                  {(!project.tasks || project.tasks.length === 0) && (
+                <p className="text-gray-500 text-center py-8">No tasks yet</p>
                   )}
                 </div>
-              ))}
-              {(!project.tasks || project.tasks.length === 0) && (
-                <p className="text-gray-500 text-center py-8">No tasks yet</p>
-              )}
-            </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        {activeTab === 'chat' && (
-          <div className="space-y-4">
+            {activeTab === 'chat' && (
+              <div className="space-y-4">
             <h3 className="text-xl font-semibold text-gray-900">Project Chat</h3>
             <div className="h-96 bg-gray-50 rounded-lg p-4 overflow-y-auto">
               {messages.map((message, index) => (
@@ -376,29 +376,29 @@ const ProjectDetailPage = () => {
                   <div className="flex items-start space-x-3">
                     <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
                       {message.userName?.charAt(0)?.toUpperCase()}
-                    </div>
+                        </div>
                     <div>
                       <div className="font-medium text-gray-900">{message.userName}</div>
                       <div className="text-gray-700">{message.message}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                      </div>
             <form onSubmit={handleSendMessage} className="flex space-x-2">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
+                      <input
+                        type="text"
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="Type a message..."
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg"
-              />
-              <button
-                type="submit"
+                      />
+                      <button
+                        type="submit"
                 className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700"
-              >
-                <Send className="w-4 h-4" />
-              </button>
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
             </form>
           </div>
         )}
@@ -429,10 +429,10 @@ const ProjectDetailPage = () => {
                   </div>
                 </div>
               ))}
-            </div>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
     </div>
   );
 };

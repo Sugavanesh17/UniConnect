@@ -64,13 +64,19 @@ const CreateProjectPage = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/projects`, {
+      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+      
+      // Filter out fields that the backend doesn't expect
+      const { requirements, maxMembers, ...projectData } = formData;
+      console.log('Sending project data:', projectData); // Debug log
+      
+      const response = await fetch(`${API_BASE_URL}/projects`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(projectData)
       });
 
       if (response.ok) {
@@ -79,6 +85,7 @@ const CreateProjectPage = () => {
         navigate(`/projects/${data.project._id}`);
       } else {
         const error = await response.json();
+        console.error('Backend error:', error); // Debug log
         toast.error(error.message || 'Failed to create project');
       }
     } catch (error) {
@@ -95,6 +102,8 @@ const CreateProjectPage = () => {
         return <Globe className="w-5 h-5" />;
       case 'private':
         return <Lock className="w-5 h-5" />;
+      case 'draft':
+        return <Eye className="w-5 h-5" />;
       default:
         return <Eye className="w-5 h-5" />;
     }
@@ -106,6 +115,8 @@ const CreateProjectPage = () => {
         return 'Anyone can view and join your project';
       case 'private':
         return 'Only invited members can access your project';
+      case 'draft':
+        return 'Only you can see this project (draft mode)';
       default:
         return 'Anyone can view but you approve join requests';
     }
@@ -128,7 +139,7 @@ const CreateProjectPage = () => {
             Start a new collaborative project and invite team members
           </p>
         </div>
-      </div>
+          </div>
 
       <div className="bg-white rounded-xl shadow-lg p-8 hover:shadow-xl transition-shadow duration-300">
         <form onSubmit={handleSubmit} className="space-y-8">
@@ -139,36 +150,36 @@ const CreateProjectPage = () => {
               Project Information
             </h2>
 
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                Project Title *
-              </label>
-              <input
+          <div>
+            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+              Project Title *
+            </label>
+            <input
                 type="text"
-                id="title"
-                name="title"
-                required
-                value={formData.title}
-                onChange={handleChange}
+              id="title"
+              name="title"
+              required
+              value={formData.title}
+              onChange={handleChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
                 placeholder="Enter project title"
-              />
-            </div>
+            />
+          </div>
 
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+          <div>
+            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
                 Description *
-              </label>
-              <textarea
-                id="description"
-                name="description"
+            </label>
+            <textarea
+              id="description"
+              name="description"
                 rows={4}
-                required
-                value={formData.description}
-                onChange={handleChange}
+              required
+              value={formData.description}
+              onChange={handleChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
                 placeholder="Describe your project goals, objectives, and what you're looking for in collaborators..."
-              />
+            />
             </div>
 
             <div>
@@ -195,7 +206,7 @@ const CreateProjectPage = () => {
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {['public', 'protected', 'private'].map((privacy) => (
+              {['public', 'draft', 'private'].map((privacy) => (
                 <label
                   key={privacy}
                   className={`relative cursor-pointer border-2 rounded-lg p-4 transition-all duration-200 hover:scale-105 ${
@@ -242,46 +253,46 @@ const CreateProjectPage = () => {
             <div>
               <label htmlFor="techStack" className="block text-sm font-medium text-gray-700 mb-2">
                 Technologies & Tools
-              </label>
-              <div className="flex space-x-2 mb-3">
-                <input
-                  type="text"
-                  value={techInput}
-                  onChange={(e) => setTechInput(e.target.value)}
-                  onKeyPress={handleTechKeyPress}
+            </label>
+            <div className="flex space-x-2 mb-3">
+              <input
+                type="text"
+                value={techInput}
+                onChange={(e) => setTechInput(e.target.value)}
+                onKeyPress={handleTechKeyPress}
                   className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
                   placeholder="e.g., React, Node.js, Python..."
-                />
-                <button
-                  type="button"
+              />
+              <button
+                type="button"
                   onClick={addTechStack}
                   className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium hover:scale-105 hover:shadow-md"
-                >
+              >
                   Add
-                </button>
-              </div>
-              
-              {formData.techStack.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {formData.techStack.map((tech, index) => (
-                    <span
-                      key={index}
+              </button>
+            </div>
+            
+            {formData.techStack.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {formData.techStack.map((tech, index) => (
+                  <span
+                    key={index}
                       className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 hover:scale-105 transition-transform duration-200"
-                    >
-                      {tech}
-                      <button
-                        type="button"
+                  >
+                    {tech}
+                    <button
+                      type="button"
                         onClick={() => removeTechStack(tech)}
                         className="ml-2 text-blue-600 hover:text-blue-800 transition-colors duration-200"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
+                  </div>
 
           {/* Team Settings */}
           <div className="space-y-6">
@@ -290,7 +301,7 @@ const CreateProjectPage = () => {
               Team Settings
             </h2>
 
-            <div>
+                  <div>
               <label htmlFor="maxMembers" className="block text-sm font-medium text-gray-700 mb-2">
                 Maximum Team Size
               </label>
@@ -298,7 +309,7 @@ const CreateProjectPage = () => {
                 id="maxMembers"
                 name="maxMembers"
                 value={formData.maxMembers}
-                onChange={handleChange}
+                  onChange={handleChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
               >
                 <option value={3}>3 members</option>
