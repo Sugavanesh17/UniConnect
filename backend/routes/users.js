@@ -172,33 +172,6 @@ router.put('/profile', [
   }
 });
 
-// @route   GET /api/users/:id
-// @desc    Get user by ID (public profile)
-// @access  Private
-router.get('/:id', protect, async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    
-    if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'User not found' 
-      });
-    }
-
-    res.json({
-      success: true,
-      user: user.publicProfile
-    });
-  } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
-  }
-});
-
 // @route   GET /api/users/search
 // @desc    Search users by skills or university
 // @access  Private
@@ -289,6 +262,33 @@ router.get('/trust-stats', protect, async (req, res) => {
     });
   } catch (error) {
     console.error('Get trust stats error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error' 
+    });
+  }
+});
+
+// @route   GET /api/users/:id
+// @desc    Get user by ID (public profile)
+// @access  Private
+router.get('/:id', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+
+    res.json({
+      success: true,
+      user: user.publicProfile
+    });
+  } catch (error) {
+    console.error('Get user error:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Server error' 
