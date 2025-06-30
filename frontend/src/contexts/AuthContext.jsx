@@ -175,3 +175,37 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+
+export const NotificationsContext = createContext();
+
+export const NotificationsProvider = ({ children }) => {
+  const [notifications, setNotifications] = useState([]);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      if (!user) return;
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/users/notifications`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setNotifications(data.notifications || []);
+        }
+      } catch (error) {
+        // Optionally handle error
+      }
+    };
+    fetchNotifications();
+  }, [user]);
+
+  return (
+    <NotificationsContext.Provider value={{ notifications, setNotifications }}>
+      {children}
+    </NotificationsContext.Provider>
+  );
+};
+
+export const useNotifications = () => useContext(NotificationsContext);

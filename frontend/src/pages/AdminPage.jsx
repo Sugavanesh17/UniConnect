@@ -25,6 +25,8 @@ const AdminPage = () => {
   const [projects, setProjects] = useState([]);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showReportsTab, setShowReportsTab] = useState(false);
+  const [resolveModal, setResolveModal] = useState({ open: false, report: null, note: '', loading: false });
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -201,6 +203,32 @@ const AdminPage = () => {
     } catch (error) {
       console.error('Delete project error:', error);
       toast.error('Failed to delete project');
+    }
+  };
+
+  const openResolveModal = (report) => setResolveModal({ open: true, report, note: '', loading: false });
+  const closeResolveModal = () => setResolveModal({ open: false, report: null, note: '', loading: false });
+  const handleResolve = async () => {
+    if (!resolveModal.report) return;
+    setResolveModal((prev) => ({ ...prev, loading: true }));
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/admin/reports/${resolveModal.report._id}/resolve`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ adminNote: resolveModal.note })
+      });
+      if (response.ok) {
+        toast.success('Report resolved');
+        fetchReports();
+        closeResolveModal();
+      } else {
+        toast.error('Failed to resolve report');
+      }
+    } catch (error) {
+      toast.error('Failed to resolve report');
+    } finally {
+      setResolveModal((prev) => ({ ...prev, loading: false }));
     }
   };
 
@@ -463,10 +491,79 @@ const AdminPage = () => {
         {activeTab === 'reports' && (
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-gray-900">Reports & Flags</h3>
-                <div className="text-center py-8 text-gray-500">
-              <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p>No reports available</p>
-            </div>
+            {reports.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p>No reports available</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full bg-white rounded-xl shadow">
+                  <thead>
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Reported User</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Reporter</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Project</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Reason</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reports.map((r) => (
+                      <tr key={r._id} className="border-t">
+                        <td className="px-6 py-4 align-top whitespace-nowrap text-sm text-gray-900">{r.reportedUser?.name || 'N/A'}</td>
+                        <td className="px-6 py-4 align-top whitespace-nowrap text-sm text-gray-900">{r.reportedBy?.name || 'N/A'}</td>
+                        <td className="px-6 py-4 align-top whitespace-nowrap text-sm text-gray-900">{r.project?.title || 'N/A'}</td>
+                        <td className="px-6 py-4 align-top max-w-xs truncate text-sm text-gray-700" title={r.reason}>{r.reason}</td>
+                        <td className="px-6 py-4 align-top text-sm">
+                          {r.status === 'open' ? <span className="text-yellow-600 font-semibold">Open</span> : <span className="text-green-600 font-semibold">Resolved</span>}
+                        </td>
+                        <td className="px-6 py-4 align-top text-sm">
+                          {r.status === 'open' ? (
+                            <button onClick={() => openResolveModal(r)} className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700">Resolve</button>
+                          ) : (
+                            <span className="text-xs text-gray-500">Done</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {resolveModal.open && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md mx-auto animate-fade-in">
+                  <h2 className="text-xl font-bold text-gray-900 mb-2">Resolve Report</h2>
+                  <p className="text-gray-700 mb-4">Add a note for resolving the report on <span className="font-semibold">{resolveModal.report?.reportedUser?.name}</span>.</p>
+                  <textarea
+                    className="w-full border border-gray-300 rounded-lg p-3 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    rows={3}
+                    placeholder="Resolution note (optional)"
+                    value={resolveModal.note}
+                    onChange={e => setResolveModal((prev) => ({ ...prev, note: e.target.value }))}
+                    disabled={resolveModal.loading}
+                  />
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={closeResolveModal}
+                      className="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition"
+                      disabled={resolveModal.loading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleResolve}
+                      className="px-4 py-2 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 transition shadow-sm"
+                      disabled={resolveModal.loading}
+                    >
+                      {resolveModal.loading ? 'Resolving...' : 'Resolve'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -4,6 +4,7 @@ const { protect, canViewProject, canEditProject, projectOwner, hasSignedNDA, can
 const Project = require('../models/Project');
 const TrustLog = require('../models/TrustLog');
 const User = require('../models/User');
+const Report = require('../models/Report');
 
 const router = express.Router();
 
@@ -814,6 +815,35 @@ router.post('/:projectId/sign-nda', protect, canViewProject, async (req, res) =>
       success: false, 
       message: 'Server error' 
     });
+  }
+});
+
+// @route   POST /api/projects/:projectId/report
+// @desc    Project owner reports a user in their project
+// @access  Private (Owner only)
+router.post('/:projectId/report', [protect, projectOwner, body('userId').isMongoId(), body('reason').isLength({ min: 10, max: 1000 })], async (req, res) => {
+  try {
+    const { userId, reason } = req.body;
+    const project = await Project.findById(req.params.projectId);
+    if (!project) {
+      return res.status(404).json({ success: false, message: 'Project not found' });
+    }
+    if (!project.members.some(m => m.user.toString() === userId)) {
+      return res.status(400).json({ success: false, message: 'User is not a member of this project' });
+    }
+    if (userId === req.user._id.toString()) {
+      return res.status(400).json({ success: false, message: 'You cannot report yourself' });
+    }
+    const report = await Report.create({
+      reportedUser: userId,
+      reportedBy: req.user._id,
+      project: project._id,
+      reason
+    });
+    res.status(201).json({ success: true, message: 'Report submitted', report });
+  } catch (error) {
+    console.error('Report user error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

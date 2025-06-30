@@ -6,6 +6,7 @@ const TrustLog = require('../models/TrustLog');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
+const Notification = require('../models/Notification');
 
 const router = express.Router();
 
@@ -266,6 +267,19 @@ router.get('/trust-stats', protect, async (req, res) => {
       success: false, 
       message: 'Server error' 
     });
+  }
+});
+
+// @route   GET /api/users/notifications
+// @desc    Get notifications for the logged-in user
+// @access  Private
+router.get('/notifications', protect, async (req, res) => {
+  try {
+    const notifications = await Notification.find({ user: req.user._id }).sort({ createdAt: -1 });
+    res.json({ notifications });
+  } catch (error) {
+    console.error('Fetch notifications error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

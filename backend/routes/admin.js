@@ -4,6 +4,8 @@ const { protect, admin } = require('../middleware/auth');
 const User = require('../models/User');
 const Project = require('../models/Project');
 const TrustLog = require('../models/TrustLog');
+const Report = require('../models/Report');
+const Notification = require('../models/Notification');
 
 const router = express.Router();
 
@@ -401,29 +403,50 @@ router.get('/trust-logs', async (req, res) => {
 });
 
 // @route   GET /api/admin/reports
-// @desc    Get reports and flags (placeholder for future implementation)
+// @desc    List all user reports
 // @access  Private (Admin only)
-router.get('/reports', async (req, res) => {
+router.get('/reports', protect, admin, async (req, res) => {
   try {
-    // For now, return empty reports array
-    // This can be expanded later when reporting system is implemented
-    res.json({
-      success: true,
-      reports: [],
-      pagination: {
-        page: 1,
-        limit: 20,
-        total: 0,
-        pages: 0
-      }
-    });
+    const reports = await Report.find()
+      .populate('reportedUser', 'name email')
+      .populate('reportedBy', 'name email')
+      .populate('project', 'title')
+      .sort({ status: 1, createdAt: -1 });
+    res.json({ reports });
   } catch (error) {
-    console.error('Get reports error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
+    console.error('Fetch reports error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
-module.exports = router; 
+// @route   PUT /api/admin/reports/:reportId/resolve
+// @desc    Resolve a user report
+// @access  Private (Admin only)
+router.put('/reports/:reportId/resolve', protect, admin, async (req, res) => {
+  try {
+    const { adminNote } = req.body;
+    const report = await Report.findById(req.params.reportId);
+    if (!report) {
+      return res.status(404).json({ message: 'Report not found' });
+    }
+    report.status = 'resolved';
+    report.adminNote = adminNote || '';
+    report.resolvedBy = req.user._id;
+    report.resolvedAt = new Date();
+    await report.save();
+    const project = await Project.findById(report.project).populate('owner', 'name');
+    const reportedUser = await User.findById(report.reportedUser);
+    const notification = await Notification.create({
+      user: report.reportedBy,
+      type: 'report_resolved',
+      message: `Your report on user ${reportedUser.name} in project "${project.title}" has been resolved by admin.`,
+      report: report._id
+    });
+    res.json({ success: true, message: 'Report resolved', report });
+  } catch (error) {
+    console.error('Resolve report error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+module.exports = router;
