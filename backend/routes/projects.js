@@ -32,21 +32,17 @@ router.get('/', protect, async (req, res) => {
       if (privacy === 'public') {
         filter.privacy = 'public';
       } else if (privacy === 'private') {
-        // Only show private projects if user is owner or member
-        filter.$or = [
-          { privacy: 'private', owner: req.user._id },
-          { privacy: 'private', 'members.user': req.user._id }
-        ];
+        // Show all private projects (for join requests), but hide description for non-members
+        filter.privacy = 'private';
       } else if (privacy === 'protected') {
         filter.privacy = 'protected';
       }
     } else {
-      // Show public, protected, and user's private projects
+      // Show public, protected, and all private projects
       filter.$or = [
         { privacy: 'public' },
         { privacy: 'protected' },
-        { privacy: 'private', owner: req.user._id },
-        { privacy: 'private', 'members.user': req.user._id }
+        { privacy: 'private' }
       ];
     }
 
@@ -94,11 +90,26 @@ router.get('/', protect, async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit));
 
+    // After fetching projects, hide description for private projects if user is not owner or member
+    const projectsWithHiddenDescriptions = projects.map(project => {
+      if (
+        project.privacy === 'private' &&
+        project.owner.toString() !== req.user._id.toString() &&
+        !project.isMember(req.user._id)
+      ) {
+        return {
+          ...project.toObject(),
+          description: 'Description hidden. Join to view details.'
+        };
+      }
+      return project;
+    });
+
     // Get total count for pagination
     const total = await Project.countDocuments(filter);
 
     res.json({
-      projects,
+      projects: projectsWithHiddenDescriptions,
       pagination: {
         currentPage: parseInt(page),
         totalPages: Math.ceil(total / parseInt(limit)),
@@ -479,6 +490,25 @@ router.post('/:projectId/join-request', [
       });
     }
 
+    // --- NEW LOGIC: Public projects allow instant join ---
+    if (project.privacy === 'public') {
+      await project.addMember(req.user._id, 'viewer');
+      // Log trust activity for joining project
+      await TrustLog.logActivity(
+        req.user._id,
+        'project_joined',
+        TrustLog.getPointsForAction('project_joined'),
+        `Joined project: ${project.title}`,
+        { projectId: project._id }
+      );
+      return res.json({
+        success: true,
+        message: 'You have joined the project successfully.'
+      });
+    }
+    // --- END NEW LOGIC ---
+
+    // For private projects, keep join request flow
     // Check if user already has a pending request
     const existingRequest = project.joinRequests.find(
       request => request.user.toString() === req.user._id.toString() && request.status === 'pending'
