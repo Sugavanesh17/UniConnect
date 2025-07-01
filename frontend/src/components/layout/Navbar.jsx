@@ -145,52 +145,54 @@ const Navbar = () => {
             )}
           </div>
 
-          {/* Notifications */}
-          <div className="relative ml-4 flex items-center">
-            <button
-              ref={bellRef}
-              className={`relative flex items-center justify-center transition-transform ${unreadCount > 0 ? 'animate-bounce' : ''}`}
-              onClick={() => setShowDropdown((v) => !v)}
-              aria-label="Notifications"
-              style={{ minHeight: 40, zIndex: 50 }}
-            >
-              <Bell className="w-6 h-6 text-gray-600 hover:text-blue-600" />
-              {unreadCount > 0 && (
-                <span className="absolute top-0 right-0 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5 translate-x-1/2 -translate-y-1/2 shadow">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-            {showDropdown && (
-              <div
-                ref={dropdownRef}
-                className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg z-40 max-h-96 overflow-y-auto"
+          {/* Notifications - Only show when authenticated */}
+          {isAuthenticated && (
+            <div className="relative ml-4 flex items-center">
+              <button
+                ref={bellRef}
+                className={`relative flex items-center justify-center transition-transform ${unreadCount > 0 ? 'animate-bounce' : ''}`}
+                onClick={() => setShowDropdown((v) => !v)}
+                aria-label="Notifications"
+                style={{ minHeight: 40, zIndex: 50 }}
               >
-                <div className="flex items-center justify-between p-4 border-b font-semibold text-gray-900">
-                  <span>Notifications</span>
-                  {unreadCount > 0 && (
-                    <button onClick={markAllAsRead} className="text-xs text-blue-600 hover:underline">Mark all as read</button>
+                <Bell className="w-6 h-6 text-gray-600 hover:text-blue-600" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 bg-red-600 text-white text-xs rounded-full px-1.5 py-0.5 translate-x-1/2 -translate-y-1/2 shadow">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+              {showDropdown && (
+                <div
+                  ref={dropdownRef}
+                  className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg z-40 max-h-96 overflow-y-auto"
+                >
+                  <div className="flex items-center justify-between p-4 border-b font-semibold text-gray-900">
+                    <span>Notifications</span>
+                    {unreadCount > 0 && (
+                      <button onClick={markAllAsRead} className="text-xs text-blue-600 hover:underline">Mark all as read</button>
+                    )}
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div className="p-4 text-gray-500 text-center">No notifications</div>
+                  ) : (
+                    notifications.map((n) => (
+                      <div
+                        key={n._id}
+                        className={`flex items-start gap-2 px-4 py-3 border-b last:border-b-0 ${!n.read ? 'bg-blue-50' : 'bg-white'} rounded transition`}
+                      >
+                        {!n.read && <span className="mt-1 w-2 h-2 bg-blue-500 rounded-full inline-block" />}
+                        <div className="flex-1">
+                          <div className="text-sm text-gray-800">{n.message}</div>
+                          <div className="text-xs text-gray-500 mt-1">{new Date(n.createdAt).toLocaleString()}</div>
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
-                {notifications.length === 0 ? (
-                  <div className="p-4 text-gray-500 text-center">No notifications</div>
-                ) : (
-                  notifications.map((n) => (
-                    <div
-                      key={n._id}
-                      className={`flex items-start gap-2 px-4 py-3 border-b last:border-b-0 ${!n.read ? 'bg-blue-50' : 'bg-white'} rounded transition`}
-                    >
-                      {!n.read && <span className="mt-1 w-2 h-2 bg-blue-500 rounded-full inline-block" />}
-                      <div className="flex-1">
-                        <div className="text-sm text-gray-800">{n.message}</div>
-                        <div className="text-xs text-gray-500 mt-1">{new Date(n.createdAt).toLocaleString()}</div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* Mobile menu button */}
           <div className="md:hidden flex items-center">
