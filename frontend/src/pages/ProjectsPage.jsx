@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import SearchableDropdown from '../components/common/SearchableDropdown.jsx';
 import { 
   FolderOpen, 
   Users, 
@@ -30,6 +31,14 @@ const ProjectsPage = () => {
   const [projectToDelete, setProjectToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const deleteButtonRef = useRef();
+
+  // Sort options for the dropdown
+  const sortOptions = [
+    { value: 'recent', label: 'Most Recent' },
+    { value: 'oldest', label: 'Oldest' },
+    { value: 'members', label: 'Most Members' },
+    { value: 'name', label: 'Name A-Z' }
+  ];
 
   useEffect(() => {
     fetchProjects();
@@ -228,16 +237,13 @@ const ProjectsPage = () => {
             ))}
           </div>
 
-          <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
-          >
-              <option value="recent">Most Recent</option>
-              <option value="oldest">Oldest</option>
-              <option value="members">Most Members</option>
-              <option value="name">Name A-Z</option>
-          </select>
+          <SearchableDropdown
+            options={sortOptions}
+            value={sortBy}
+            onChange={setSortBy}
+            placeholder="Sort by..."
+            className="w-48"
+          />
         </div>
       </div>
 

@@ -330,6 +330,7 @@ router.get('/:projectId', protect, canViewProjectDetails, hasSignedNDA, async (r
     await req.project.populate('owner', 'name university trustScore');
     await req.project.populate('members.user', 'name university trustScore');
     await req.project.populate('joinRequests.user', 'name university trustScore');
+    await req.project.populate('tasks.assignedTo', 'name email');
 
     res.json({
       success: true,
@@ -382,7 +383,8 @@ router.put('/:projectId', [
       updateFields,
       { new: true, runValidators: true }
     ).populate('owner', 'name university trustScore')
-     .populate('members.user', 'name university trustScore');
+     .populate('members.user', 'name university trustScore')
+     .populate('tasks.assignedTo', 'name email');
 
     res.json({
       success: true,
@@ -605,22 +607,33 @@ router.post('/:projectId/tasks', [
   canEditProject,
   body('title').trim().isLength({ min: 1, max: 200 }).withMessage('Title is required'),
   body('description').optional().isLength({ max: 1000 }).withMessage('Description cannot exceed 1000 characters'),
-  body('assignedTo').optional().isMongoId().withMessage('Invalid user ID'),
+  body('assignedTo').optional().custom((value) => {
+    if (value === null || value === undefined || value === '') {
+      return true; // Allow null/empty values
+    }
+    return require('mongoose').Types.ObjectId.isValid(value) || 'Invalid user ID';
+  }).withMessage('Invalid user ID'),
   body('dueDate').optional().isISO8601().toDate().withMessage('Invalid date format'),
   body('status').optional().isIn(['todo', 'in-progress', 'completed']).withMessage('Invalid status')
 ], async (req, res) => {
   try {
+    console.log('Task creation request body:', req.body); // Debug log
+    
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array()); // Debug log
       return res.status(400).json({ 
         success: false, 
+        message: 'Validation failed',
         errors: errors.array() 
       });
     }
 
     const { title, description, assignedTo, dueDate, status = 'todo' } = req.body;
     const project = req.project;
+
+    console.log('Creating task with data:', { title, description, assignedTo, dueDate, status }); // Debug log
 
     const newTask = {
       title,
@@ -641,6 +654,9 @@ router.post('/:projectId/tasks', [
       const lastTask = project.tasks[project.tasks.length - 1];
       await project.populate('tasks.assignedTo', 'name email');
     }
+
+    // Always populate tasks.assignedTo for the response
+    await project.populate('tasks.assignedTo', 'name email');
 
     res.status(201).json({
       success: true,
@@ -664,7 +680,12 @@ router.put('/:projectId/tasks/:taskId', [
   canEditProject,
   body('title').optional().trim().isLength({ min: 1, max: 200 }).withMessage('Title must be between 1 and 200 characters'),
   body('description').optional().isLength({ max: 1000 }).withMessage('Description cannot exceed 1000 characters'),
-  body('assignedTo').optional().isMongoId().withMessage('Invalid user ID'),
+  body('assignedTo').optional().custom((value) => {
+    if (value === null || value === undefined || value === '') {
+      return true; // Allow null/empty values
+    }
+    return require('mongoose').Types.ObjectId.isValid(value) || 'Invalid user ID';
+  }).withMessage('Invalid user ID'),
   body('dueDate').optional().isISO8601().toDate().withMessage('Invalid date format'),
   body('status').optional().isIn(['todo', 'in-progress', 'completed']).withMessage('Invalid status')
 ], async (req, res) => {
@@ -717,10 +738,8 @@ router.put('/:projectId/tasks/:taskId', [
       );
     }
 
-    // Populate the assignedTo field if it exists
-    if (task.assignedTo) {
-      await project.populate('tasks.assignedTo', 'name email');
-    }
+    // Always populate tasks.assignedTo for the response
+    await project.populate('tasks.assignedTo', 'name email');
 
     res.json({
       success: true,

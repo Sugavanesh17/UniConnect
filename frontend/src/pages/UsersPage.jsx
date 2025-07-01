@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import SearchableDropdown from '../components/common/SearchableDropdown.jsx';
 import { 
   Users, 
   Search, 
@@ -21,6 +22,21 @@ const UsersPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
+
+  // Filter options for the dropdown
+  const filterOptions = [
+    { value: 'all', label: 'All Users' },
+    { value: 'student', label: 'Students' },
+    { value: 'admin', label: 'Admins' }
+  ];
+
+  // Sort options for the dropdown
+  const sortOptions = [
+    { value: 'name', label: 'Name A-Z' },
+    { value: 'trustScore', label: 'Trust Score' },
+    { value: 'recent', label: 'Recently Joined' },
+    { value: 'university', label: 'University' }
+  ];
 
   useEffect(() => {
     fetchUsers();
@@ -132,26 +148,21 @@ const UsersPage = () => {
 
           {/* Filters */}
           <div className="flex gap-4">
-            <select
+            <SearchableDropdown
+              options={filterOptions}
               value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
-            >
-              <option value="all">All Users</option>
-              <option value="student">Students</option>
-              <option value="admin">Admins</option>
-            </select>
+              onChange={setFilter}
+              placeholder="Filter by role..."
+              className="w-48"
+            />
 
-            <select
+            <SearchableDropdown
+              options={sortOptions}
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 hover:border-gray-400"
-            >
-              <option value="name">Name A-Z</option>
-              <option value="trustScore">Trust Score</option>
-              <option value="recent">Recently Joined</option>
-              <option value="university">University</option>
-            </select>
+              onChange={setSortBy}
+              placeholder="Sort by..."
+              className="w-48"
+            />
           </div>
         </div>
       </div>

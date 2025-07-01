@@ -20,6 +20,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import SearchableDropdown from '../components/common/SearchableDropdown.jsx';
 
 const ProjectDetailPage = () => {
   const { projectId } = useParams();
@@ -32,7 +33,7 @@ const ProjectDetailPage = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [newTask, setNewTask] = useState({ name: '', assignedTo: '', deadline: '' });
+  const [newTask, setNewTask] = useState({ title: '', assignedTo: '', dueDate: '' });
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportUser, setReportUser] = useState(null);
@@ -129,23 +130,53 @@ const ProjectDetailPage = () => {
 
   const handleCreateTask = async (e) => {
     e.preventDefault();
+    
+    // Debug: Check user permissions
+    console.log('User:', user);
+    console.log('Project owner:', project?.owner);
+    console.log('Project members:', project?.members);
+    console.log('Is owner:', isOwner);
+    console.log('Is member:', isMember);
+    console.log('Can edit:', canEdit);
+    
     try {
+      // Format the task data properly
+      const taskData = {
+        title: newTask.title,
+        dueDate: newTask.dueDate ? new Date(newTask.dueDate).toISOString() : null
+      };
+
+      // Only add assignedTo if it has a value
+      if (newTask.assignedTo && newTask.assignedTo.trim() !== '') {
+        taskData.assignedTo = newTask.assignedTo;
+      }
+
+      console.log('Creating task with data:', taskData); // Debug log
       const response = await fetch(`${API_BASE_URL}/projects/${projectId}/tasks`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(newTask)
+        body: JSON.stringify(taskData)
       });
 
+      console.log('Response status:', response.status); // Debug log
+
       if (response.ok) {
+        const data = await response.json();
+        toast.success(data.message || 'Task created successfully');
         fetchProject();
-        setNewTask({ name: '', assignedTo: '', deadline: '' });
+        setNewTask({ title: '', assignedTo: '', dueDate: '' });
         setShowTaskForm(false);
+      } else {
+        const errorData = await response.json();
+        console.error('Error response:', errorData); // Debug log
+        toast.error(errorData.message || 'Failed to create task');
       }
     } catch (error) {
       console.error('Error creating task:', error);
+      toast.error('Failed to create task');
     }
   };
 
@@ -161,10 +192,16 @@ const ProjectDetailPage = () => {
       });
 
       if (response.ok) {
+        const data = await response.json();
+        toast.success(data.message || 'Task status updated successfully');
         fetchProject();
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.message || 'Failed to update task status');
       }
     } catch (error) {
       console.error('Error updating task:', error);
+      toast.error('Failed to update task status');
     }
   };
 
@@ -469,15 +506,26 @@ const ProjectDetailPage = () => {
                     <input
                       type="text"
                       placeholder="Task name"
-                      value={newTask.name}
-                      onChange={(e) => setNewTask({ ...newTask, name: e.target.value })}
+                      value={newTask.title}
+                      onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       required
                     />
+                    <SearchableDropdown
+                      options={project.members?.map(member => ({
+                        value: member.user._id,
+                        label: `${member.user.name} (${member.role})`,
+                        avatar: member.user.avatar // if you have avatar URLs, otherwise remove this line
+                      })) || []}
+                      value={newTask.assignedTo}
+                      onChange={val => setNewTask({ ...newTask, assignedTo: val })}
+                      placeholder="Assign to..."
+                      className="mb-2"
+                    />
                     <input
                       type="date"
-                      value={newTask.deadline}
-                      onChange={(e) => setNewTask({ ...newTask, deadline: e.target.value })}
+                      value={newTask.dueDate}
+                      onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
                       className="px-3 py-2 border border-gray-300 rounded-lg"
                     />
                     <div className="flex space-x-2">
@@ -501,12 +549,22 @@ const ProjectDetailPage = () => {
                 <div className="space-y-3">
                   {project.tasks?.map((task) => (
                     <div key={task._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        {getTaskStatusIcon(task.status)}
-                        <span className="font-medium">{task.name}</span>
-                        <span className={`px-2 py-1 text-xs rounded-full ${getTaskStatusColor(task.status)}`}>
-                          {task.status}
-                        </span>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          {getTaskStatusIcon(task.status)}
+                          <span className="font-medium">{task.title}</span>
+                          <span className={`px-2 py-1 text-xs rounded-full ${getTaskStatusColor(task.status)}`}>
+                            {task.status}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-600 space-y-1">
+                          {task.assignedTo && (
+                            <div>Assigned to: {task.assignedTo.name || 'Unknown user'}</div>
+                          )}
+                          {task.dueDate && (
+                            <div>Due: {new Date(task.dueDate).toLocaleDateString()}</div>
+                          )}
+                        </div>
                       </div>
                       {canEdit && (
                         <select
