@@ -151,7 +151,7 @@ const UsersPage = () => {
             <SearchableDropdown
               options={filterOptions}
               value={filter}
-              onChange={setFilter}
+              onChange={val => { setFilter(val); }}
               placeholder="Filter by role..."
               className="w-48"
             />
@@ -159,7 +159,7 @@ const UsersPage = () => {
             <SearchableDropdown
               options={sortOptions}
               value={sortBy}
-              onChange={setSortBy}
+              onChange={val => { setSortBy(val); }}
               placeholder="Sort by..."
               className="w-48"
             />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useSocket } from '../contexts/SocketContext.jsx';
@@ -17,7 +17,9 @@ import {
   UserPlus,
   Send,
   Paperclip,
-  Trash2
+  Trash2,
+  Edit3,
+  X
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import SearchableDropdown from '../components/common/SearchableDropdown.jsx';
@@ -33,14 +35,48 @@ const ProjectDetailPage = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [editingMessage, setEditingMessage] = useState(null);
+  const [editMessageContent, setEditMessageContent] = useState('');
+  const [typingUsers, setTypingUsers] = useState([]);
   const [newTask, setNewTask] = useState({ title: '', assignedTo: '', dueDate: '' });
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportUser, setReportUser] = useState(null);
   const [reportReason, setReportReason] = useState('');
   const [reportLoading, setReportLoading] = useState(false);
+  const chatContainerRef = useRef(null);
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+  const scrollToBottom = () => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  };
+
+  const fetchMessages = async () => {
+    setMessagesLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/messages/${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMessages(data.messages || []);
+      } else {
+        console.error('Failed to fetch messages');
+      }
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    } finally {
+      setMessagesLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchProject();
@@ -48,15 +84,41 @@ const ProjectDetailPage = () => {
       joinProject(projectId);
       
       socket.on('new-message', (message) => {
+        console.log('Received new-message via socket:', message);
         setMessages(prev => [...prev, message]);
+      });
+
+      socket.on('user-typing', (data) => {
+        if (data.userId !== user?._id) {
+          setTypingUsers(prev => {
+            const filtered = prev.filter(u => u.userId !== data.userId);
+            if (data.isTyping) {
+              return [...filtered, { userId: data.userId, userName: data.userName }];
+            }
+            return filtered;
+          });
+        }
       });
 
       return () => {
         leaveProject(projectId);
         socket.off('new-message');
+        socket.off('user-typing');
       };
     }
-  }, [projectId, socket]);
+  }, [projectId, socket, user]);
+
+  // Fetch messages when projectId or project changes (not just on tab switch)
+  useEffect(() => {
+    if (projectId && project) {
+      fetchMessages();
+    }
+  }, [projectId, project]);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const fetchProject = async () => {
     try {
@@ -96,9 +158,79 @@ const ProjectDetailPage = () => {
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (newMessage.trim()) {
-      sendMessage(projectId, newMessage);
+      console.log('Sending message via socket:', newMessage.trim());
+      sendMessage(projectId, newMessage.trim());
       setNewMessage('');
     }
+  };
+
+  const handleTyping = (e) => {
+    setNewMessage(e.target.value);
+  };
+
+  const handleEditMessage = async (messageId, newContent) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/messages/${messageId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ content: newContent })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMessages(prev => prev.map(msg => 
+          msg._id === messageId ? data.message : msg
+        ));
+        setEditingMessage(null);
+        setEditMessageContent('');
+        toast.success('Message updated successfully');
+      } else {
+        const error = await response.json();
+        toast.error(error.message || 'Failed to update message');
+      }
+    } catch (error) {
+      console.error('Error updating message:', error);
+      toast.error('Failed to update message');
+    }
+  };
+
+  const handleDeleteMessage = async (messageId) => {
+    if (!window.confirm('Are you sure you want to delete this message?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/messages/${messageId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        setMessages(prev => prev.filter(msg => msg._id !== messageId));
+        toast.success('Message deleted successfully');
+      } else {
+        const error = await response.json();
+        toast.error(error.message || 'Failed to delete message');
+      }
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      toast.error('Failed to delete message');
+    }
+  };
+
+  const startEditingMessage = (message) => {
+    setEditingMessage(message._id);
+    setEditMessageContent(message.content);
+  };
+
+  const cancelEditingMessage = () => {
+    setEditingMessage(null);
+    setEditMessageContent('');
   };
 
   const handleJoinProject = async () => {
@@ -589,34 +721,122 @@ const ProjectDetailPage = () => {
             {activeTab === 'chat' && (
               <div className="space-y-4">
                 <h3 className="text-xl font-semibold text-gray-900">Project Chat</h3>
-                <div className="h-96 bg-gray-50 rounded-lg p-4 overflow-y-auto">
-                  {messages.map((message, index) => (
-                    <div key={index} className="mb-4">
-                      <div className="flex items-start space-x-3">
-                        <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                          {message.userName?.charAt(0)?.toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="font-medium text-gray-900">{message.userName}</div>
-                          <div className="text-gray-700">{message.message}</div>
-                        </div>
-                      </div>
+                <div className="h-96 bg-gray-50 rounded-lg p-4 overflow-y-auto" ref={chatContainerRef}>
+                  {messagesLoading ? (
+                    <div className="text-center text-gray-500 py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-2"></div>
+                      <p>Loading messages...</p>
                     </div>
-                  ))}
+                  ) : messages.length === 0 ? (
+                    <div className="text-center text-gray-500 py-8">
+                      <MessageSquare className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                      <p>No messages yet. Start the conversation!</p>
+                    </div>
+                  ) : (
+                    <>
+                      {messages.map((message) => (
+                        <div key={message._id} className="mb-4">
+                          <div className="flex items-start space-x-3">
+                            <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                              {message.sender?.name?.charAt(0)?.toUpperCase() || 'U'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center space-x-2">
+                                <div className="font-medium text-gray-900">{message.sender?.name || 'Unknown User'}</div>
+                                <div className="text-xs text-gray-500">
+                                  {new Date(message.createdAt).toLocaleString()}
+                                </div>
+                                {message.isEdited && (
+                                  <span className="text-xs text-gray-400">(edited)</span>
+                                )}
+                              </div>
+                              <div className="text-gray-700 mt-1 break-words">
+                                {editingMessage === message._id ? (
+                                  <div className="space-y-2">
+                                    <textarea
+                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                      value={editMessageContent}
+                                      onChange={e => setEditMessageContent(e.target.value)}
+                                      autoFocus
+                                    />
+                                    <div className="flex space-x-2">
+                                      <button 
+                                        onClick={() => handleEditMessage(message._id, editMessageContent)}
+                                        className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                                      >
+                                        Save
+                                      </button>
+                                      <button 
+                                        onClick={cancelEditingMessage}
+                                        className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  message.content
+                                )}
+                              </div>
+                              {(message.sender?._id === user?._id || isOwner) && !editingMessage && (
+                                <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
+                                  {message.sender?._id === user?._id && (
+                                    <button 
+                                      onClick={() => startEditingMessage(message)}
+                                      className="hover:text-gray-700 transition-colors"
+                                      title="Edit message"
+                                    >
+                                      <Edit3 className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                  <button 
+                                    onClick={() => handleDeleteMessage(message._id)}
+                                    className="hover:text-red-600 transition-colors"
+                                    title="Delete message"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {typingUsers.length > 0 && (
+                        <div className="flex items-center space-x-2 text-sm text-gray-500 italic">
+                          <div className="flex space-x-1">
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                          </div>
+                          <span>
+                            {typingUsers.map((user, index) => user.userName).join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
                 <form onSubmit={handleSendMessage} className="flex space-x-2">
                   <input
                     type="text"
                     value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
+                    onChange={handleTyping}
                     placeholder="Type a message..."
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    disabled={sendingMessage}
                   />
                   <button
                     type="submit"
-                    className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700"
+                    className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                    disabled={!newMessage.trim() || sendingMessage}
                   >
-                    <Send className="w-4 h-4" />
+                    {sendingMessage ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                    <span>Send</span>
                   </button>
                 </form>
               </div>

@@ -8,6 +8,7 @@ const dotenv = require('dotenv');
 const http = require('http');
 const socketIo = require('socket.io');
 const Project = require('./models/Project');
+const Message = require('./models/Message');
 
 // Load environment variables
 dotenv.config();
@@ -17,6 +18,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const projectRoutes = require('./routes/projects');
 const adminRoutes = require('./routes/admin');
+const messageRoutes = require('./routes/messages');
 
 // Import middleware
 const { errorHandler } = require('./middleware/errorHandler');
@@ -59,6 +61,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/messages', messageRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -90,16 +93,47 @@ io.on('connection', (socket) => {
         socket.emit('error-message', { message: 'Project not found.' });
         return;
       }
-      const member = project.members.find(m => m.user.toString() === data.userId);
-      if (!member || !['owner', 'contributor'].includes(member.role)) {
+      
+      // Check if user has access to the project
+      if (!project.canView(data.userId)) {
         socket.emit('error-message', { message: 'You do not have permission to send messages in this project.' });
         return;
       }
-      io.to(`project-${data.projectId}`).emit('new-message', data);
+
+      // Create and save the message to database
+      const message = new Message({
+        project: data.projectId,
+        sender: data.userId,
+        content: data.message
+      });
+
+      await message.save();
+      await message.populate('sender', 'name email');
+
+      // Emit the saved message to all project members
+      io.to(`project-${data.projectId}`).emit('new-message', {
+        _id: message._id,
+        project: message.project,
+        sender: message.sender,
+        content: message.content,
+        messageType: message.messageType,
+        isEdited: message.isEdited,
+        createdAt: message.createdAt,
+        updatedAt: message.updatedAt
+      });
     } catch (err) {
       console.error('Socket send-message error:', err);
       socket.emit('error-message', { message: 'Server error sending message.' });
     }
+  });
+
+  socket.on('typing', (data) => {
+    // Broadcast typing status to other users in the project
+    socket.to(`project-${data.projectId}`).emit('user-typing', {
+      userId: data.userId,
+      userName: data.userName,
+      isTyping: data.isTyping
+    });
   });
 
   socket.on('disconnect', () => {

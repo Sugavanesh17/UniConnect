@@ -38,6 +38,23 @@ router.post('/register', [
 
     const { name, email, password, university, bio, skills, github, linkedin } = req.body;
 
+    // Allow all common student/university email domains
+    const allowedStudentDomains = [
+      '.edu',
+      '.ac.in',
+      '.ac.uk',
+      '.edu.au',
+      // add more as needed
+    ];
+    const emailDomain = email.split('@')[1] || '';
+    const isStudentEmail = allowedStudentDomains.some(domain => emailDomain.endsWith(domain));
+    if (!isStudentEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please use your student/university email address to register.'
+      });
+    }
+
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
